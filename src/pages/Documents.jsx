@@ -23,113 +23,7 @@ import {
   Receipt,
 } from "lucide-react";
 
-const initialDocuments = [
-  {
-    id: 1,
-    name: "Aadhaar Card",
-    category: "Identity",
-    holder: "Kajal",
-    documentNo: "XXXX XXXX 4821",
-    added: "12 Aug 2026",
-    expiry: "No Expiry",
-    status: "Verified",
-    image:
-      "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=1200&q=90",
-    icon: UserRound,
-  },
-  {
-    id: 2,
-    name: "PAN Card",
-    category: "Identity",
-    holder: "Kajal",
-    documentNo: "ABCDE4821F",
-    added: "10 Aug 2026",
-    expiry: "No Expiry",
-    status: "Verified",
-    image:
-      "https://images.unsplash.com/photo-1554224154-26032ffc0d07?auto=format&fit=crop&w=1200&q=90",
-    icon: CreditCard,
-  },
-  {
-    id: 3,
-    name: "Property Documents",
-    category: "Property",
-    holder: "Kajal",
-    documentNo: "PROP-2026-018",
-    added: "05 Aug 2026",
-    expiry: "No Expiry",
-    status: "Important",
-    image:
-      "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1200&q=90",
-    icon: Home,
-  },
-  {
-    id: 4,
-    name: "Car RC",
-    category: "Vehicle",
-    holder: "Kajal",
-    documentNo: "DL-01-AB-4821",
-    added: "01 Aug 2026",
-    expiry: "09 Jan 2039",
-    status: "Active",
-    image:
-      "https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&w=1200&q=90",
-    icon: Car,
-  },
-  {
-    id: 5,
-    name: "Health Insurance",
-    category: "Insurance",
-    holder: "Kajal",
-    documentNo: "POL-889421",
-    added: "28 Jul 2026",
-    expiry: "28 Jul 2027",
-    status: "Active",
-    image:
-      "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=1200&q=90",
-    icon: ShieldCheck,
-  },
-  {
-    id: 6,
-    name: "Education Certificate",
-    category: "Education",
-    holder: "Kajal",
-    documentNo: "CERT-2024-219",
-    added: "20 Jul 2026",
-    expiry: "No Expiry",
-    status: "Verified",
-    image:
-  "https://images.unsplash.com/photo-1498243691581-b145c3f54a5a?auto=format&fit=crop&w=1200&q=90",
-    icon: GraduationCap,
-  },
-  {
-    
-  id: 7,
-  name: "Birth Certificate",
-  category: "Personal",
-  holder: "Kajal",
-  documentNo: "BC-2001-4821",
-  added: "14 Jul 2026",
-  expiry: "No Expiry",
-  status: "Verified",
-  image:
-    "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=1200&q=90",
-  icon: FileCheck2,
-},
-  {
-  id: 8,
-  name: "Electricity Bill",
-  category: "Bills",
-  holder: "Kajal",
-  documentNo: "BILL-AUG-2026",
-  added: "05 Aug 2026",
-  expiry: "05 Sep 2026",
-  status: "Current",
-  image:
-    "https://m.economictimes.com/thumb/msid-66837243,width-1200,height-900,resizemode-4,imgsize-137112/electricity-bill.jpg",
-  icon: Receipt,
-},
-];
+
 
 const categories = [
   "All",
@@ -145,27 +39,69 @@ const categories = [
 function Documents() {
   const [documents, setDocuments] = useState([]);
 
+ const [user, setUser] = useState(null);
+const [userId, setUserId] = useState(null);
+const [authLoading, setAuthLoading] = useState(true);
+
+useEffect(() => {
+  try {
+    const savedUser = localStorage.getItem("myhomeUser");
+
+    if (!savedUser) {
+      setUser(null);
+      setUserId(null);
+      return;
+    }
+
+    const parsedUser = JSON.parse(savedUser);
+
+    setUser(parsedUser);
+    setUserId(parsedUser?.id || null);
+  } catch (error) {
+    console.error("USER LOAD ERROR:", error);
+    setUser(null);
+    setUserId(null);
+  } finally {
+    setAuthLoading(false);
+  }
+}, []);
+
 useEffect(() => {
   const loadDocuments = async () => {
+    if (!userId) {
+      setDocuments([]);
+      return;
+    }
+
     try {
       const response = await fetch(
-        "http://localhost:5000/api/documents"
+        `http://localhost:5000/api/documents?user_id=${userId}`
       );
-
-      if (!response.ok) {
-        throw new Error("Failed to load documents");
-      }
 
       const data = await response.json();
 
-      setDocuments(data);
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message || "Failed to load documents"
+        );
+      }
+
+      setDocuments(
+        Array.isArray(data.documents)
+          ? data.documents
+          : []
+      );
     } catch (error) {
       console.error("LOAD documents error:", error);
+      setDocuments([]);
     }
   };
 
-  loadDocuments();
-}, []);
+  if (!authLoading) {
+    loadDocuments();
+  }
+}, [userId, authLoading]); 
+
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [view, setView] = useState("grid");
@@ -177,7 +113,7 @@ useEffect(() => {
   const filteredDocuments = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    return documents.filter((doc) => {
+    return (Array.isArray(documents) ? documents : []).filter((doc) => {
       const searchable =
         `${doc.name} ${doc.category} ${doc.holder} ${doc.documentNo}`.toLowerCase();
 
@@ -189,6 +125,10 @@ useEffect(() => {
   }, [documents, search, category]);
 
   const deleteDocument = async (id) => {
+    if (!userId) {
+  alert("Please login first.");
+  return;
+}
     const doc = documents.find((item) => item.id === id);
 
     if (!doc) return;
@@ -199,9 +139,12 @@ useEffect(() => {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/documents/${id}`,
-        { method: "DELETE" }
+        `http://localhost:5000/api/documents/${id}?user_id=${userId}`,
+        {
+          method: "DELETE",
+        }
       );
+      
       const data = await response.json();
 
       if (!response.ok || !data.success) {
@@ -226,6 +169,11 @@ useEffect(() => {
   };
 
   const addDocument = async (newDocument) => {
+  if (!userId) {
+    alert("Please login first.");
+    return;
+  }
+
   try {
     const response = await fetch(
       "http://localhost:5000/api/documents",
@@ -245,6 +193,7 @@ useEffect(() => {
           image: newDocument.image,
           image_type: newDocument.image_type,
           icon: newDocument.icon,
+          user_id: userId,
         }),
       }
     );
@@ -252,15 +201,34 @@ useEffect(() => {
     const data = await response.json();
 
     if (!response.ok || !data.success) {
-      console.error("ADD document error:", data);
-      alert(data.message || "Failed to save document");
-      return;
-    }
+  console.error("ADD document error:", data);
+  alert(data.message || "Failed to save document");
+  return;
+}
 
-    setDocuments((prev) => [
-      data.document,
-      ...prev,
-    ]);
+const savedDocument = {
+  ...data.document,
+  documentNo:
+    data.document?.documentNo ||
+    data.document?.document_no ||
+    "",
+};
+
+setDocuments((prev) => [
+  savedDocument,
+  ...(Array.isArray(prev) ? prev : []),
+]);
+
+setShowAdd(false);
+
+    setDocuments(
+  Array.isArray(data.documents)
+    ? data.documents.map((doc) => ({
+        ...doc,
+        documentNo: doc.documentNo || doc.document_no || "",
+      }))
+    : []
+);
 
     setShowAdd(false);
 
@@ -269,13 +237,22 @@ useEffect(() => {
     alert(`ADD DOCUMENT ERROR: ${error.message}`);
   }
 };
-
   const saveDocument = async (updatedDocument) => {
+  if (!userId) {
+    alert("Please login first.");
+    return;
+  }
+
+  if (!updatedDocument?.id) {
+    alert("Document ID is missing.");
+    return;
+  }
+
   try {
     const response = await fetch(
-      `http://localhost:5000/api/documents/${updatedDocument.id}`,
-      {
-        method: "PUT",
+  `http://localhost:5000/api/documents/${updatedDocument.id}?user_id=${userId}`,
+  {
+    method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
@@ -289,6 +266,7 @@ useEffect(() => {
           status: updatedDocument.status,
           image: updatedDocument.image,
           image_type: updatedDocument.image_type,
+          user_id: userId,
         }),
       }
     );
@@ -301,13 +279,27 @@ useEffect(() => {
       return;
     }
 
-    setDocuments((prev) =>
-      prev.map((item) =>
-        item.id === updatedDocument.id
-          ? data.document
-          : item
-      )
-    );
+    const updatedDoc = {
+  ...data.document,
+  documentNo:
+    data.document.documentNo ||
+    data.document.document_no ||
+    "",
+};
+
+setDocuments((prev) =>
+  prev.map((item) =>
+    item.id === updatedDocument.id
+      ? updatedDoc
+      : item
+  )
+);
+
+setEditing(null);
+
+if (selected?.id === updatedDocument.id) {
+  setSelected(updatedDoc);
+}
 
     setEditing(null);
 
@@ -1313,11 +1305,12 @@ function DocumentFormModal({
   onSave,
 }) {
   const [form, setForm] = useState({
-    id: document?.id,
-    name: document?.name || "",
-    category: document?.category || "Identity",
-    holder: document?.holder || "Kajal",
-    documentNo: document?.documentNo || "",
+  id: document?.id,
+  name: document?.name || "",
+  category: document?.category || "Identity",
+  holder: document?.holder || "Kajal",
+  documentNo: document?.documentNo || 
+  "",
     added: document?.added || "",
     expiry: document?.expiry || "No Expiry",
     status: document?.status || "New",

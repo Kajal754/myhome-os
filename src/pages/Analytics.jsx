@@ -9,24 +9,86 @@ import {
   ArrowUpRight,
   CalendarDays,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
-const months = [
-  { name: "Mar", amount: 7200 },
-  { name: "Apr", amount: 9400 },
-  { name: "May", amount: 6800 },
-  { name: "Jun", amount: 11200 },
-  { name: "Jul", amount: 8900 },
-  { name: "Aug", amount: 4590 },
-];
-
-const categories = [
+const categoryMeta = [
   { name: "Maintenance", amount: 1800, percent: 39, icon: Wrench },
   { name: "Utilities", amount: 2340, percent: 51, icon: Receipt },
   { name: "Vehicle", amount: 450, percent: 10, icon: CalendarDays },
 ];
 
 function Analytics() {
-  const max = Math.max(...months.map((item) => item.amount));
+  const storedUser = localStorage.getItem("myhomeUser");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  const userId = user?.id;
+  const [expenses, setExpenses] = useState([]);
+  const [assets, setAssets] = useState([]);
+  const [maintenanceRecords, setMaintenanceRecords] = useState([]);
+  const [reminders, setReminders] = useState([]);
+
+  useEffect(() => {
+    setExpenses([]);
+    setAssets([]);
+    setMaintenanceRecords([]);
+    setReminders([]);
+    if (!userId) return;
+
+    Promise.all([
+      fetch(`http://localhost:5000/api/expenses?user_id=${userId}`),
+      fetch(`http://localhost:5000/api/assets?user_id=${userId}`),
+      fetch(`http://localhost:5000/api/maintenance?user_id=${userId}`),
+      fetch(`http://localhost:5000/api/reminders?user_id=${userId}`),
+    ])
+      .then((responses) => Promise.all(responses.map((response) => response.json())))
+      .then(([expenseData, assetData, maintenanceData, reminderData]) => {
+        if (expenseData.success) setExpenses(expenseData.expenses || []);
+        if (assetData.success) setAssets(assetData.assets || []);
+        if (maintenanceData.success) setMaintenanceRecords(maintenanceData.records || []);
+        if (reminderData.success) setReminders(reminderData.reminders || []);
+      })
+      .catch((error) => console.error("LOAD analytics data error:", error));
+  }, [userId]);
+
+  const total = useMemo(
+    () => expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0),
+    [expenses]
+  );
+  const maintenanceTotal = useMemo(
+    () => expenses
+      .filter((item) => item.category === "Maintenance")
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0),
+    [expenses]
+  );
+  const warrantyStats = useMemo(() => {
+    const today = new Date();
+    const active = assets.filter((asset) => asset.warranty && new Date(asset.warranty) >= today).length;
+    const expiring = assets.filter((asset) => {
+      if (!asset.warranty) return false;
+      const days = (new Date(asset.warranty) - today) / 86400000;
+      return days >= 0 && days <= 90;
+    }).length;
+    return { active, expiring };
+  }, [assets]);
+  const months = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 6 }, (_, index) => {
+      const date = new Date(now.getFullYear(), now.getMonth() - 5 + index, 1);
+      const amount = expenses
+        .filter((item) => {
+          const expenseDate = new Date(item.date);
+          return expenseDate.getFullYear() === date.getFullYear() && expenseDate.getMonth() === date.getMonth();
+        })
+        .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+      return { name: date.toLocaleDateString("en-IN", { month: "short" }), amount };
+    });
+  }, [expenses]);
+  const categories = useMemo(() => categoryMeta.map((item) => {
+    const amount = expenses
+      .filter((expense) => expense.category === item.name)
+      .reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+    return { ...item, amount, percent: total ? Math.round((amount / total) * 100) : 0 };
+  }), [expenses, total]);
+  const max = Math.max(...months.map((item) => item.amount), 1);
 
   return (
     <div className="space-y-6">
@@ -50,11 +112,11 @@ function Analytics() {
           <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/50">
             <p className="text-xs font-medium text-slate-400">This year</p>
             <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-white">
-              ₹48,090
+              ₹{total.toLocaleString("en-IN")}
             </p>
             <div className="mt-2 flex items-center gap-1 text-xs font-semibold text-emerald-600">
               <TrendingDown size={14} />
-              8% lower than last year
+              {expenses.length} saved expense records
             </div>
           </div>
         </div>
@@ -62,10 +124,10 @@ function Analytics() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          ["Total spending", "₹48,090", Wallet, "8% lower", "emerald"],
-          ["This month", "₹4,590", TrendingUp, "vs ₹4,980", "blue"],
-          ["Maintenance", "₹18,450", Wrench, "38% of spending", "amber"],
-          ["Active warranties", "8", ShieldCheck, "2 expiring soon", "violet"],
+          ["Total spending", `₹${total.toLocaleString("en-IN")}`, Wallet, "Saved expenses", "emerald"],
+          ["This month", `₹${total.toLocaleString("en-IN")}`, TrendingUp, "Current records", "blue"],
+          ["Maintenance", `₹${maintenanceTotal.toLocaleString("en-IN")}`, Wrench, `${maintenanceRecords.length} records`, "amber"],
+          ["Active warranties", warrantyStats.active, ShieldCheck, `${warrantyStats.expiring} expiring soon`, "violet"],
         ].map(([label, value, Icon, note, tone]) => (
           <div
             key={label}
@@ -168,11 +230,11 @@ function Analytics() {
         </div>
 
         <div className="mt-5 grid gap-3 md:grid-cols-3">
-          {[
-            ["Warranty health", "8 active", "2 expiring soon", ShieldCheck],
-            ["Maintenance", "6 this month", "3 upcoming", Wrench],
-            ["Budget trend", "₹4,590", "8% lower than July", Wallet],
-          ].map(([title, value, note, Icon]) => (
+              {[
+                ["Warranty health", `${warrantyStats.active} active`, `${warrantyStats.expiring} expiring soon`, ShieldCheck],
+                ["Maintenance", `${maintenanceRecords.length} records`, `${maintenanceRecords.filter((item) => item.status !== "completed").length} upcoming`, Wrench],
+                ["Budget trend", `₹${total.toLocaleString("en-IN")}`, `${reminders.filter((item) => !item.completed).length} active reminders`, Wallet],
+              ].map(([title, value, note, Icon]) => (
             <div key={title} className="rounded-2xl border border-slate-100 p-4 dark:border-slate-800">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">

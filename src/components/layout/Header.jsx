@@ -8,6 +8,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import { getDisplayName } from "../../utils/helpers";
 
 function Header({ onMenuClick }) {
   const [darkMode, setDarkMode] = useState(
@@ -16,21 +17,27 @@ function Header({ onMenuClick }) {
   const [profilePhoto, setProfilePhoto] = useState(
     () => localStorage.getItem("myhome-photo") || ""
   );
+  const [profileName, setProfileName] = useState(() => {
+    const savedUser = localStorage.getItem("myhomeUser");
+    const user = savedUser ? JSON.parse(savedUser) : null;
+    return getDisplayName(user);
+  });
 
   useEffect(() => {
-    const updateProfilePhoto = () => {
+    const updateProfile = () => {
       setProfilePhoto(localStorage.getItem("myhome-photo") || "");
+      const savedUser = localStorage.getItem("myhomeUser");
+      const user = savedUser ? JSON.parse(savedUser) : null;
+      setProfileName(getDisplayName(user));
     };
 
-    window.addEventListener(
-      "myhome-profile-photo-change",
-      updateProfilePhoto
-    );
+    window.addEventListener("myhome-profile-change", updateProfile);
+    window.addEventListener("myhome-profile-photo-change", updateProfile);
 
-    window.removeEventListener(
-      "myhome-profile-photo-change",
-      updateProfilePhoto
-    );
+    return () => {
+      window.removeEventListener("myhome-profile-change", updateProfile);
+      window.removeEventListener("myhome-profile-photo-change", updateProfile);
+    };
   }, []);
 
   useEffect(() => {
@@ -237,18 +244,18 @@ function Header({ onMenuClick }) {
             {profilePhoto ? (
               <img
                 src={profilePhoto}
-                alt="Miss Kajal"
+                alt={profileName}
                 className="h-9 w-9 rounded-full border-2 border-white object-cover shadow-md"
               />
             ) : (
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-orange-200 to-blue-300 text-xs font-bold text-slate-800">
-                K
+                {profileName.charAt(0).toUpperCase()}
               </div>
             )}
 
             <div className="hidden text-left sm:block">
               <p className="text-xs font-bold text-slate-900 dark:text-white">
-                Miss Kajal
+                {profileName}
               </p>
               <p className="text-[10px] text-slate-400">Home Owner</p>
             </div>

@@ -15,7 +15,7 @@ import {
   PackageCheck,
   ArrowUpRight,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const initialWarranties = [
   {
@@ -65,12 +65,67 @@ const initialWarranties = [
 ];
 
 function Warranties() {
-  const [warranties, setWarranties] = useState(initialWarranties);
+  const storedUser = localStorage.getItem("myhomeUser");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  const userId = user?.id;
+  const [warranties, setWarranties] = useState([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [selectedWarranty, setSelectedWarranty] = useState(null);
   const [editingWarranty, setEditingWarranty] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const loadWarranties = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/assets?user_id=${userId}`
+        );
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || "Failed to load warranties");
+        }
+
+        const today = new Date();
+        const records = (data.assets || [])
+          .filter((asset) => asset.warranty)
+          .map((asset) => {
+            const expiryDate = new Date(asset.warranty);
+            const daysRemaining = Math.ceil(
+              (expiryDate - today) / (1000 * 60 * 60 * 24)
+            );
+            const status = daysRemaining < 0
+              ? "expired"
+              : daysRemaining <= 90
+              ? "expiring"
+              : "active";
+
+            return {
+              id: asset.id,
+              assetId: asset.id,
+              product: asset.name,
+              category: asset.category || "Other",
+              brand: asset.brand || "-",
+              model: asset.model || "-",
+              expires: asset.warranty,
+              remaining: daysRemaining < 0 ? "Expired" : `${daysRemaining} days`,
+              status,
+              progress: Math.max(0, Math.min(100, 100 - daysRemaining / 7)),
+              sourceAsset: asset,
+            };
+          });
+
+        setWarranties(records);
+      } catch (error) {
+        console.error("LOAD warranties error:", error);
+      }
+    };
+
+    loadWarranties();
+  }, [userId]);
 
   const stats = useMemo(
     () => ({
@@ -133,24 +188,73 @@ function Warranties() {
     };
   };
 
-  const deleteWarranty = () => {
+  const deleteWarranty = async () => {
     if (!deleteTarget) return;
 
-    setWarranties((current) =>
-      current.filter((item) => item.id !== deleteTarget.id)
-    );
+    const asset = deleteTarget.sourceAsset;
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/assets/${deleteTarget.assetId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...asset,
+            user_id: userId,
+            warranty: null,
+            purchase_date: asset.purchase_date,
+          }),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message);
+
+      setWarranties((current) => current.filter((item) => item.id !== deleteTarget.id));
+    } catch (error) {
+      console.error("DELETE warranty error:", error);
+      alert("Could not remove warranty from database.");
+      return;
+    }
 
     setDeleteTarget(null);
   };
 
-  const saveEdit = (event) => {
+  const saveEdit = async (event) => {
     event.preventDefault();
 
-    setWarranties((current) =>
-      current.map((item) =>
-        item.id === editingWarranty.id ? editingWarranty : item
-      )
-    );
+    const asset = editingWarranty.sourceAsset;
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/assets/${editingWarranty.assetId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...asset,
+            user_id: userId,
+            name: editingWarranty.product,
+            category: editingWarranty.category,
+            brand: editingWarranty.brand,
+            model: editingWarranty.model,
+            warranty: editingWarranty.expires,
+            purchase_date: asset.purchase_date,
+          }),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message);
+
+      const updatedAsset = data.asset;
+      setWarranties((current) => current.map((item) =>
+        item.id === editingWarranty.id
+          ? { ...editingWarranty, sourceAsset: updatedAsset }
+          : item
+      ));
+    } catch (error) {
+      console.error("UPDATE warranty error:", error);
+      alert("Could not update warranty in database.");
+      return;
+    }
 
     setEditingWarranty(null);
   };

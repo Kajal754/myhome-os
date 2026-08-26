@@ -19,7 +19,7 @@ import {
   PackageCheck,
 } from "lucide-react";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const initialRecords = [
   {
@@ -91,13 +91,38 @@ const initialRecords = [
 ];
 
 function Maintenance() {
-  const [records, setRecords] = useState(initialRecords);
+  const storedUser = localStorage.getItem("myhomeUser");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  const userId = user?.id;
+  const [records, setRecords] = useState([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
 
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [editingRecord, setEditingRecord] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  useEffect(() => {
+    setRecords([]);
+    if (!userId) return;
+
+    const loadRecords = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/maintenance?user_id=${userId}`
+        );
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || "Failed to load maintenance records");
+        }
+        setRecords(data.records || []);
+      } catch (error) {
+        console.error("LOAD maintenance error:", error);
+      }
+    };
+
+    loadRecords();
+  }, [userId]);
 
   const stats = useMemo(() => {
     const completed = records.filter(
@@ -180,31 +205,63 @@ function Maintenance() {
     };
   };
 
-  const deleteRecord = () => {
+  const deleteRecord = async () => {
     if (!deleteTarget) return;
+
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/maintenance/${deleteTarget.id}?user_id=${userId}`,
+        { method: "DELETE" }
+      );
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message);
 
     setRecords((current) =>
       current.filter((item) => item.id !== deleteTarget.id)
     );
 
     setDeleteTarget(null);
+    } catch (error) {
+      console.error("DELETE maintenance error:", error);
+      alert("Could not delete maintenance record.");
+    }
   };
 
   const saveEdit = (event) => {
     event.preventDefault();
 
+    const updateRecord = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/maintenance/${editingRecord.id}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...editingRecord, user_id: userId }),
+          }
+        );
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message);
+
     setRecords((current) =>
       current.map((item) =>
         item.id === editingRecord.id
           ? {
-              ...editingRecord,
-              cost: Number(editingRecord.cost || 0),
+              ...data.record,
+              cost: Number(data.record.cost || 0),
             }
           : item
       )
     );
 
     setEditingRecord(null);
+      } catch (error) {
+        console.error("UPDATE maintenance error:", error);
+        alert("Could not update maintenance record.");
+      }
+    };
+
+    updateRecord();
   };
 
   const formatMoney = (value) => {

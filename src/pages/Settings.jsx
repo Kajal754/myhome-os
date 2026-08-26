@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Settings as SettingsIcon,
   User,
@@ -23,6 +24,15 @@ const DEFAULT_PROFILE = {
 };
 
 function Settings() {
+  const navigate = useNavigate();
+  const storedUser = localStorage.getItem("myhomeUser");
+  const registeredUser = storedUser ? JSON.parse(storedUser) : null;
+  const userId = registeredUser?.id;
+
+  const [theme, setTheme] = useState(() =>
+    localStorage.getItem("myhome-theme") === "dark" ? "dark" : "light"
+  );
+
   const [notifications, setNotifications] = useState(
     () => localStorage.getItem("myhome-notifications") !== "false"
   );
@@ -35,14 +45,18 @@ function Settings() {
 
   const [profile, setProfile] = useState(() => ({
 
-  name: localStorage.getItem("myhome-name") || DEFAULT_PROFILE.name,
-  email: localStorage.getItem("myhome-email") || DEFAULT_PROFILE.email,
+  name: registeredUser?.name || localStorage.getItem("myhome-name") || DEFAULT_PROFILE.name,
+  email: registeredUser?.email || localStorage.getItem("myhome-email") || DEFAULT_PROFILE.email,
   photo: localStorage.getItem("myhome-photo") || "",
 }));
 useEffect(() => {
   const loadSettings = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/settings");
+      if (!userId) return;
+
+      const response = await fetch(
+        `http://localhost:5000/api/settings?user_id=${userId}`
+      );
       const data = await response.json();
 
       if (!response.ok || !data.success) {
@@ -68,11 +82,7 @@ useEffect(() => {
   };
 
   loadSettings();
-}, []);
-
-  const [theme, setTheme] = useState(() =>
-    localStorage.getItem("myhome-theme") === "dark" ? "dark" : "light"
-  );
+}, [userId]);
 
   const [modal, setModal] = useState(null);
   const [draft, setDraft] = useState(profile);
@@ -164,6 +174,7 @@ useEffect(() => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        user_id: userId,
         name,
         email,
         photo: draft.photo || "",
@@ -186,6 +197,15 @@ useEffect(() => {
       photo: draft.photo || "",
     });
 
+    localStorage.setItem(
+      "myhomeUser",
+      JSON.stringify({
+        ...registeredUser,
+        name,
+        email,
+      })
+    );
+
     localStorage.setItem("myhome-name", name);
     localStorage.setItem("myhome-email", email);
     localStorage.setItem("myhome-photo", draft.photo || "");
@@ -193,6 +213,7 @@ useEffect(() => {
     window.dispatchEvent(
       new Event("myhome-profile-photo-change")
     );
+    window.dispatchEvent(new Event("myhome-profile-change"));
 
     setModal(null);
     notify("Profile saved successfully");
@@ -202,6 +223,71 @@ useEffect(() => {
     notify("Failed to save settings");
   }
 };
+
+  const deleteProfile = async () => {
+    const confirmed = window.confirm(
+      "Delete this profile? Your home data and login account will remain safe."
+    );
+    if (!confirmed || !userId) return;
+
+    try {
+      const response = await fetch(
+        "http://localhost:5000/api/settings",
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: userId,
+            name: DEFAULT_PROFILE.name,
+            email: registeredUser?.email || profile.email,
+            photo: "",
+            notifications,
+            warranty_alerts: warrantyAlerts,
+            maintenance_alerts: maintenanceAlerts,
+            theme,
+          }),
+        }
+      );
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to reset profile");
+      }
+
+      const updatedUser = {
+        ...registeredUser,
+        name: DEFAULT_PROFILE.name,
+        email: registeredUser?.email || profile.email,
+      };
+      localStorage.setItem("myhomeUser", JSON.stringify(updatedUser));
+      localStorage.removeItem("myhome-name");
+      localStorage.removeItem("myhome-photo");
+      setProfile({
+        name: DEFAULT_PROFILE.name,
+        email: updatedUser.email,
+        photo: "",
+      });
+      setDraft({
+        name: DEFAULT_PROFILE.name,
+        email: updatedUser.email,
+        photo: "",
+      });
+      setModal(null);
+      window.dispatchEvent(new Event("myhome-profile-change"));
+      window.dispatchEvent(new Event("myhome-profile-photo-change"));
+      notify("Profile deleted. You can add it again.");
+    } catch (error) {
+      console.error("DELETE PROFILE ERROR:", error);
+      notify("Failed to delete profile");
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("myhomeUser");
+    localStorage.removeItem("rememberMe");
+    navigate("/login", { replace: true });
+  };
 
   const resetSettings = () => {
     const confirmed = window.confirm(
@@ -243,6 +329,18 @@ useEffect(() => {
           description: profile.email,
           button: "Manage",
           onClick: openProfile,
+        },
+        {
+          title: "Delete profile",
+          description: "Permanently remove this account and its data",
+          button: "Delete",
+          onClick: deleteProfile,
+        },
+        {
+          title: "Log out",
+          description: "Sign out and switch to another account",
+          button: "Log out",
+          onClick: logout,
         },
       ],
     },
@@ -449,6 +547,23 @@ useEffect(() => {
               Edit Profile
             </button>
 
+            <button
+              type="button"
+              onClick={deleteProfile}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:hover:bg-red-500/10"
+            >
+              <Trash2 size={14} />
+              Delete Profile
+            </button>
+
+            <button
+              type="button"
+              onClick={logout}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              Log out
+            </button>
+
             <div className="mt-5 rounded-2xl bg-slate-50 p-4 dark:bg-slate-950/60">
               <div className="flex items-center gap-2 text-xs font-semibold text-emerald-600">
                 <Check size={14} />
@@ -569,6 +684,15 @@ useEffect(() => {
             >
               <Save size={16} />
               Save Changes
+            </button>
+
+            <button
+              type="button"
+              onClick={deleteProfile}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:hover:bg-red-500/10"
+            >
+              <Trash2 size={16} />
+              Delete Profile
             </button>
           </div>
         </Modal>

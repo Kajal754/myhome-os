@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Plus,
   Search,
@@ -85,8 +85,36 @@ const iconMap = {
   Mechanic: Car,
 };
 
+function normalizeProvider(provider) {
+  return {
+    ...provider,
+    rating: Number(provider.rating) || 0,
+    icon: iconMap[provider.category] || Wrench,
+    lastVisit: provider.last_visit || "No visit yet",
+    visits: Number(provider.visits) || 0,
+    location: provider.location || "Not specified",
+    status: provider.status || "New",
+  };
+}
+
+async function readApiResponse(response) {
+  const text = await response.text();
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(
+      "Backend server port 5000 par run nahi ho raha. Please start server."
+    );
+  }
+}
+
 function ServiceProviders() {
-  const [providers, setProviders] = useState(initialProviders);
+  void initialProviders;
+  const [providers, setProviders] = useState([]);
+  const storedUser = localStorage.getItem("myhomeUser");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  const userId = user?.id;
 
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
@@ -95,6 +123,30 @@ function ServiceProviders() {
   const [viewProvider, setViewProvider] = useState(null);
   const [editProvider, setEditProvider] = useState(null);
   const [deleteProvider, setDeleteProvider] = useState(null);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const loadProviders = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/service-providers?user_id=${userId}`
+        );
+        const data = await readApiResponse(response);
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || "Failed to load providers");
+        }
+
+        setProviders((data.providers || []).map(normalizeProvider));
+      } catch (error) {
+        console.error("LOAD providers error:", error);
+        alert(error.message || "Could not load service providers.");
+      }
+    };
+
+    loadProviders();
+  }, [userId]);
 
   const filteredProviders = useMemo(() => {
     const query = search.toLowerCase().trim();
@@ -129,58 +181,103 @@ function ServiceProviders() {
     0
   );
 
-  const handleAdd = (event) => {
+  const handleAdd = async (event) => {
     event.preventDefault();
 
     const form = new FormData(event.currentTarget);
 
     const providerCategory = form.get("category");
 
-    const newProvider = {
-      id: Date.now(),
-      name: form.get("name"),
-      category: providerCategory,
-      phone: form.get("phone"),
-      rating: Number(form.get("rating")) || 0,
-      icon: iconMap[providerCategory] || Wrench,
-      lastVisit: form.get("lastVisit") || "No visit yet",
-      visits: 0,
-      location: form.get("location") || "Not specified",
-      status: "New",
-    };
+    try {
+      const response = await fetch("http://localhost:5000/api/service-providers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          name: form.get("name"),
+          category: providerCategory,
+          phone: form.get("phone"),
+          rating: form.get("rating"),
+          last_visit: form.get("lastVisit"),
+          location: form.get("location"),
+        }),
+      });
+      const data = await readApiResponse(response);
 
-    setProviders((current) => [newProvider, ...current]);
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to save provider");
+      }
+
+      setProviders((current) => [normalizeProvider(data.provider), ...current]);
+    } catch (error) {
+      console.error("ADD provider error:", error);
+      alert(error.message || "Could not save service provider.");
+      return;
+    }
+
     setShowAdd(false);
   };
 
-  const handleEdit = (event) => {
+  const handleEdit = async (event) => {
     event.preventDefault();
 
-    setProviders((current) =>
-      current.map((provider) =>
-        provider.id === editProvider.id
-          ? {
-              ...editProvider,
-              rating: Number(editProvider.rating),
-              icon:
-                iconMap[editProvider.category] ||
-                Wrench,
-            }
-          : provider
-      )
-    );
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/service-providers/${editProvider.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...editProvider,
+            user_id: userId,
+            last_visit: editProvider.lastVisit,
+          }),
+        }
+      );
+      const data = await readApiResponse(response);
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to update provider");
+      }
+
+      setProviders((current) =>
+        current.map((provider) =>
+          provider.id === editProvider.id
+            ? normalizeProvider(data.provider)
+            : provider
+        )
+      );
+    } catch (error) {
+      console.error("EDIT provider error:", error);
+      alert(error.message || "Could not update service provider.");
+      return;
+    }
 
     setEditProvider(null);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteProvider) return;
 
-    setProviders((current) =>
-      current.filter(
-        (provider) => provider.id !== deleteProvider.id
-      )
-    );
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/service-providers/${deleteProvider.id}?user_id=${userId}`,
+        { method: "DELETE" }
+      );
+      const data = await readApiResponse(response);
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to delete provider");
+      }
+
+      setProviders((current) =>
+        current.filter((provider) => provider.id !== deleteProvider.id)
+      );
+    } catch (error) {
+      console.error("DELETE provider error:", error);
+      alert(error.message || "Could not delete service provider.");
+      return;
+    }
 
     setDeleteProvider(null);
   };

@@ -13,7 +13,6 @@ import {
   Snowflake,
   IndianRupee,
   MapPin,
-  CalendarDays,
   ArrowUpRight,
   Grid3X3,
   List,
@@ -22,7 +21,7 @@ import {
   Eye
 } from "lucide-react";
 
-import { assets as initialAssets } from "../data/homeData";
+
 
 const PRODUCT_IMAGES = {
   macbook: "https://bf1af2.akinoncloudcdn.com/products/2025/03/19/354327/41c9b70c-63f6-4e9e-ab0e-8fa59e7738a4_size3840_cropCenter.jpg",
@@ -44,11 +43,23 @@ function getAssetImage(asset) {
 }
 
 function Assets() {
-  const [assetList, setAssetList] = useState(initialAssets);
-  useEffect(() => {
+  // Logged-in user
+  const storedUser = localStorage.getItem("myhomeUser");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  const userId = user?.id;
+
+  const [assetList, setAssetList] = useState([]);
+ useEffect(() => {
   const loadAssets = async () => {
+    if (!userId) {
+      console.log("User ID not found");
+      return;
+    }
+
     try {
-      const response = await fetch("http://localhost:5000/api/assets");
+      const response = await fetch(
+        `http://localhost:5000/api/assets?user_id=${userId}`
+      );
 
       if (!response.ok) {
         throw new Error("Failed to load assets");
@@ -56,21 +67,25 @@ function Assets() {
 
       const data = await response.json();
 
-      const formattedAssets = data.map((asset) => ({
-        ...asset,
-        purchaseDate: asset.purchase_date,
-        status: "Warranty Active",
-        statusType: "success",
-      }));
+if (!data.success) {
+  throw new Error(data.message || "Failed to load assets");
+}
 
-      setAssetList(formattedAssets);
+const formattedAssets = data.assets.map((asset) => ({
+  ...asset,
+  purchaseDate: asset.purchase_date,
+  status: "Warranty Active",
+  statusType: "success",
+}));
+
+setAssetList(formattedAssets);
     } catch (error) {
       console.error("LOAD assets error:", error);
     }
   };
 
   loadAssets();
-}, []);
+}, [userId]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [view, setView] = useState("grid");
@@ -85,11 +100,11 @@ function Assets() {
 
   try {
     const response = await fetch(
-      `http://localhost:5000/api/assets/${id}`,
-      {
-        method: "DELETE",
-      }
-    );
+  `http://localhost:5000/api/assets/${id}?user_id=${userId}`,
+  {
+    method: "DELETE",
+  }
+);
 
     const data = await response.json();
 
@@ -156,6 +171,7 @@ function Assets() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        user_id: userId,
         name: newAsset.name,
         category: newAsset.category,
         brand: newAsset.brand,

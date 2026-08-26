@@ -1,3 +1,5 @@
+
+import { useEffect, useState } from "react";
 import {
   Package,
   ShieldCheck,
@@ -19,14 +21,71 @@ import {
 } from "lucide-react";
 
 import { Link } from "react-router-dom";
+import { getDisplayName } from "../utils/helpers";
 
-import {
-  assets,
-  reminders,
-  expenses,
-} from "../data/homeData";
+
 
 function Dashboard() {
+ const storedUser = localStorage.getItem("myhomeUser");
+const user = storedUser ? JSON.parse(storedUser) : null;
+
+const userName = getDisplayName(user);
+
+  const [assets, setAssets] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [reminders, setReminders] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [familyMembers, setFamilyMembers] = useState([]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    loadDashboardData();
+  }, [user?.id]);
+
+  const loadDashboardData = async () => {
+    try {
+      const userId = user.id;
+
+      const [assetsRes, expensesRes, remindersRes, documentsRes, familyRes] = await Promise.all([
+        fetch(`http://localhost:5000/api/assets?user_id=${userId}`),
+        fetch(`http://localhost:5000/api/expenses?user_id=${userId}`),
+        fetch(`http://localhost:5000/api/reminders?user_id=${userId}`),
+        fetch(`http://localhost:5000/api/documents?user_id=${userId}`),
+        fetch(`http://localhost:5000/api/family-members?user_id=${userId}`),
+      ]);
+
+      const assetsData = await assetsRes.json();
+      const expensesData = await expensesRes.json();
+      const remindersData = await remindersRes.json();
+      const documentsData = await documentsRes.json();
+      const familyData = await familyRes.json();
+
+      setAssets(
+        Array.isArray(assetsData)
+          ? assetsData
+          : assetsData.assets || []
+      );
+
+      setExpenses(
+        Array.isArray(expensesData)
+          ? expensesData
+          : expensesData.expenses || []
+      );
+
+      setReminders(
+        Array.isArray(remindersData)
+          ? remindersData
+          : remindersData.reminders || []
+      );
+      setDocuments(documentsData.documents || []);
+      setFamilyMembers(familyData.members || []);
+
+    } catch (error) {
+      console.error("Dashboard data load error:", error);
+    }
+  };
+
   return (
     <div className="space-y-6">
 
@@ -38,9 +97,10 @@ function Dashboard() {
 
           <div className="flex flex-wrap gap-2">
 
-            <Pill text="4 Family Members" />
-            <Pill text="12 Assets" />
-            <Pill text="3 Reminders" />
+            <Pill text={`${familyMembers.length} Family Members`} />
+            <Pill text={`${assets.length} Assets`} />
+            <Pill text={`${documents.length} Documents`} />
+            <Pill text={`${reminders.filter((item) => !item.completed).length} Reminders`} />
 
           </div>
 
@@ -48,11 +108,11 @@ function Dashboard() {
             Your Home Dashboard
           </p>
 
-          <h1 className="mt-2 text-3xl font-extrabold leading-tight tracking-[-0.04em] text-[#07172f] sm:text-4xl">
-            Welcome back,
-            <br />
-            Miss Kajal! 👋
-          </h1>
+         <h1 className="mt-2 text-3xl font-extrabold leading-tight tracking-[-0.04em] text-[#07172f] sm:text-4xl">
+  Welcome back,
+  <br />
+  {userName}! 👋
+</h1>
 
           <p className="mt-3 max-w-[390px] text-sm leading-6 text-slate-500">
             Here's everything happening with your home today.
@@ -126,8 +186,8 @@ function Dashboard() {
         <Stat
           icon={Package}
           title="Total Assets"
-          value="12"
-          text="2 new this month"
+          value={assets.length}
+          text="Saved in your account"
           iconClass="bg-blue-50 text-blue-600"
           textClass="text-blue-600"
           icon2={ArrowUpRight}
@@ -136,8 +196,8 @@ function Dashboard() {
         <Stat
           icon={ShieldCheck}
           title="Active Warranties"
-          value="5"
-          text="3 expiring soon"
+          value={assets.filter((asset) => asset.warranty).length}
+          text="From your assets"
           iconClass="bg-emerald-50 text-emerald-600"
           textClass="text-emerald-600"
         />
@@ -145,8 +205,8 @@ function Dashboard() {
         <Stat
           icon={WalletCards}
           title="Monthly Expenses"
-          value="₹24,590"
-          text="8% vs last month"
+          value={`₹${expenses.reduce((total, item) => total + Number(item.amount || 0), 0).toLocaleString("en-IN")}`}
+          text={`${expenses.length} saved expenses`}
           iconClass="bg-violet-50 text-violet-600"
           textClass="text-violet-600"
           icon2={ArrowDownRight}
@@ -155,8 +215,8 @@ function Dashboard() {
         <Stat
           icon={Bell}
           title="Upcoming Reminders"
-          value="3"
-          text="Needs attention"
+          value={reminders.filter((item) => !item.completed).length}
+          text="From your reminders"
           iconClass="bg-orange-50 text-orange-500"
           textClass="text-orange-500"
         />

@@ -102,7 +102,10 @@ const chartData = [
 ];
 
 function Expenses() {
-  const [expenses, setExpenses] = useState(initialExpenses);
+  const storedUser = localStorage.getItem("myhomeUser");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  const userId = user?.id;
+  const [expenses, setExpenses] = useState([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
 
@@ -110,6 +113,30 @@ function Expenses() {
   const [editingExpense, setEditingExpense] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
+
+  useEffect(() => {
+    setExpenses([]);
+    if (!userId) return;
+
+    const loadExpenses = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/expenses?user_id=${userId}`
+        );
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || "Failed to load expenses");
+        }
+
+        setExpenses(data.expenses || []);
+      } catch (error) {
+        console.error("LOAD expenses error:", error);
+      }
+    };
+
+    loadExpenses();
+  }, [userId]);
 
   const total = useMemo(
     () => expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0),
@@ -159,34 +186,61 @@ function Expenses() {
         "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
     };
 
-  const deleteExpense = () => {
+  const deleteExpense = async () => {
     if (!deleteTarget) return;
 
-    setExpenses((current) =>
-      current.filter((expense) => expense.id !== deleteTarget.id)
-    );
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/expenses/${deleteTarget.id}?user_id=${userId}`,
+        { method: "DELETE" }
+      );
+      const data = await response.json();
 
-    setDeleteTarget(null);
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to delete expense");
+      }
+
+      setExpenses((current) =>
+        current.filter((expense) => expense.id !== deleteTarget.id)
+      );
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error("DELETE expense error:", error);
+      alert("Could not delete expense from database.");
+    }
   };
 
-  const saveEdit = (event) => {
+  const saveEdit = async (event) => {
     event.preventDefault();
 
-    setExpenses((current) =>
-      current.map((expense) =>
-        expense.id === editingExpense.id
-          ? {
-              ...editingExpense,
-              amount: Number(editingExpense.amount || 0),
-            }
-          : expense
-      )
-    );
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/expenses/${editingExpense.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...editingExpense, user_id: userId }),
+        }
+      );
+      const data = await response.json();
 
-    setEditingExpense(null);
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to update expense");
+      }
+
+      setExpenses((current) =>
+        current.map((expense) =>
+          expense.id === editingExpense.id ? data.expense : expense
+        )
+      );
+      setEditingExpense(null);
+    } catch (error) {
+      console.error("UPDATE expense error:", error);
+      alert("Could not update expense in database.");
+    }
   };
 
-  const addExpense = (event) => {
+  const addExpense = async (event) => {
     event.preventDefault();
 
     const form = new FormData(event.currentTarget);
@@ -198,8 +252,21 @@ function Expenses() {
 
     if (!title || !date) return;
 
-    const newExpense = {
-      id: Date.now(),
+    try {
+      const response = await fetch("http://localhost:5000/api/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId, title, category, date, amount }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to save expense");
+      }
+
+      const newExpense = {
+        ...data.expense,
+        id: data.expense.id,
       title,
       category,
       date,
@@ -216,8 +283,12 @@ function Expenses() {
           : ShoppingBag,
     };
 
-    setExpenses((current) => [newExpense, ...current]);
-    setShowAdd(false);
+      setExpenses((current) => [newExpense, ...current]);
+      setShowAdd(false);
+    } catch (error) {
+      console.error("ADD expense error:", error);
+      alert("Could not save expense to database.");
+    }
   };
 
   return (

@@ -18,70 +18,18 @@ import {
   UserCheck,
 } from "lucide-react";
 
-const initialMembers = [
-  {
-    id: 1,
-    name: "Rahul",
-    email: "rahul@example.com",
-    role: "Owner",
-    status: "Active",
-    joined: "15 Jan 2024",
-    avatar: "https://i.pravatar.cc/150?img=12",
-  },
-  {
-    id: 2,
-    name: "Dad",
-    email: "dad@example.com",
-    role: "Admin",
-    status: "Active",
-    joined: "20 Jan 2024",
-    avatar: "https://i.pravatar.cc/150?img=11",
-  },
-  {
-    id: 3,
-    name: "Mom",
-    email: "mom@example.com",
-    role: "Member",
-    status: "Active",
-    joined: "22 Jan 2024",
-    avatar: "https://i.pravatar.cc/150?img=47",
-  },
-  {
-    id: 4,
-    name: "Brother",
-    email: "brother@example.com",
-    role: "View Only",
-    status: "Active",
-    joined: "25 Jan 2024",
-    avatar: "https://i.pravatar.cc/150?img=13",
-  },
-  {
-    id: 5,
-    name: "Sister",
-    email: "sister@example.com",
-    role: "Member",
-    status: "Pending",
-    joined: "Today",
-    avatar: "https://i.pravatar.cc/150?img=44",
-  },
-  {
-    id: 6,
-    name: "Kajal",
-    email: "Kajal@example.com",
-    role: "Admin",
-    status: "Active",
-    joined: "28 Jan 2024",
-    avatar: "/images/kajal.jpg",
-  },
-];
-
 function Family() {
-  const [members, setMembers] = useState(initialMembers);
+  const storedUser = localStorage.getItem("myhomeUser");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  const userId = user?.id;
+  const [members, setMembers] = useState([]);
   useEffect(() => {
+  setMembers([]);
+  if (!userId) return;
   const loadMembers = async () => {
     try {
       const response = await fetch(
-        "http://localhost:5000/api/family-members"
+        `http://localhost:5000/api/family-members?user_id=${userId}`
       );
 
       const data = await response.json();
@@ -99,7 +47,7 @@ function Family() {
   };
 
   loadMembers();
-}, []);
+}, [userId]);
   const [search, setSearch] = useState("");
   const [selectedMember, setSelectedMember] = useState(null);
   const [editingMember, setEditingMember] = useState(null);
@@ -136,9 +84,10 @@ const deleteMember = async () => {
 
   try {
     const response = await fetch(
-      `http://localhost:5000/api/family-members/${showDelete.id}`,
+      `http://localhost:5000/api/family-members/${showDelete.id}?user_id=${userId}`,
       {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
       }
     );
 
@@ -162,21 +111,46 @@ const deleteMember = async () => {
   }
 };
 
-  const saveEdit = (updatedMember) => {
+  const saveEdit = async (updatedMember) => {
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/family-members/${updatedMember.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ...updatedMember,
+            user_id: userId,
+          }),
+        }
+      );
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to update family member");
+      }
+
     setMembers((current) =>
       current.map((member) =>
         member.id === updatedMember.id
-          ? updatedMember
+          ? data.member
           : member
       )
     );
 
     setEditingMember(null);
+    } catch (error) {
+      console.error("UPDATE FAMILY MEMBER ERROR:", error);
+      alert("UPDATE MEMBER ERROR: " + error.message);
+    }
   };
 
   const addMember = async (newMember) => {
   try {
     const memberData = {
+      user_id: userId,
       ...newMember,
       status: "Pending",
       joined: "Invitation sent",

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   ChevronLeft,
@@ -11,41 +11,6 @@ import {
   ArrowUpRight,
   CheckCircle2,
 } from "lucide-react";
-
-const schedule = [
-  {
-    id: 1,
-    title: "AC Service",
-    date: "2026-08-18",
-    time: "10:00 AM",
-    type: "maintenance",
-    subtitle: "LG Split AC",
-  },
-  {
-    id: 2,
-    title: "Electricity Bill",
-    date: "2026-08-22",
-    time: "Due date",
-    type: "bill",
-    subtitle: "Home utilities",
-  },
-  {
-    id: 3,
-    title: "TV Warranty",
-    date: "2026-08-27",
-    time: "Expiry",
-    type: "warranty",
-    subtitle: "Samsung Smart TV",
-  },
-  {
-    id: 4,
-    title: "Home Cleaning",
-    date: "2026-08-30",
-    time: "9:00 AM",
-    type: "reminder",
-    subtitle: "Household",
-  },
-];
 
 const typeInfo = {
   maintenance: {
@@ -121,6 +86,9 @@ function buildCalendar(year, month) {
 }
 
 function Calendar() {
+  const storedUser = localStorage.getItem("myhomeUser");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  const userId = user?.id;
   const today = new Date();
   const todayKey = makeDate(today.getFullYear(), today.getMonth(), today.getDate());
 
@@ -128,6 +96,62 @@ function Calendar() {
     new Date(today.getFullYear(), today.getMonth(), 1)
   );
   const [selectedDate, setSelectedDate] = useState(todayKey);
+  const [schedule, setSchedule] = useState([]);
+
+  useEffect(() => {
+    setSchedule([]);
+    if (!userId) return;
+
+    const loadSchedule = async () => {
+      try {
+        const responses = await Promise.all([
+          fetch(`http://localhost:5000/api/reminders?user_id=${userId}`),
+          fetch(`http://localhost:5000/api/maintenance?user_id=${userId}`),
+          fetch(`http://localhost:5000/api/assets?user_id=${userId}`),
+        ]);
+        const [remindersData, maintenanceData, assetsData] = await Promise.all(
+          responses.map((response) => response.json())
+        );
+
+        const reminders = (remindersData.reminders || [])
+          .filter((item) => !item.completed)
+          .map((item) => ({
+            id: `reminder-${item.id}`,
+            title: item.title,
+            date: String(item.date).slice(0, 10),
+            time: "Due date",
+            type: item.type === "maintenance" ? "maintenance" : "reminder",
+            subtitle: item.description || "Home reminder",
+          }));
+        const maintenance = (maintenanceData.records || [])
+          .filter((item) => item.date)
+          .map((item) => ({
+            id: `maintenance-${item.id}`,
+            title: item.service,
+            date: String(item.date).slice(0, 10),
+            time: "Scheduled",
+            type: "maintenance",
+            subtitle: item.asset,
+          }));
+        const warranties = (assetsData.assets || [])
+          .filter((item) => item.warranty)
+          .map((item) => ({
+            id: `warranty-${item.id}`,
+            title: item.name,
+            date: String(item.warranty).slice(0, 10),
+            time: "Expiry",
+            type: "warranty",
+            subtitle: `${item.brand || ""} ${item.model || ""}`.trim(),
+          }));
+
+        setSchedule([...reminders, ...maintenance, ...warranties]);
+      } catch (error) {
+        console.error("LOAD calendar error:", error);
+      }
+    };
+
+    loadSchedule();
+  }, [userId]);
 
   const calendar = useMemo(
     () => buildCalendar(viewDate.getFullYear(), viewDate.getMonth()),
@@ -140,7 +164,7 @@ function Calendar() {
   });
 
   const monthEvents = schedule.filter((item) => {
-    const [year, month] = item.date.split("-").map(Number);
+    const [year, month] = String(item.date).slice(0, 10).split("-").map(Number);
     return (
       year === viewDate.getFullYear() &&
       month === viewDate.getMonth() + 1
@@ -148,11 +172,11 @@ function Calendar() {
   });
 
   const selectedEvents = schedule.filter(
-    (item) => item.date === selectedDate
+    (item) => String(item.date).slice(0, 10) === selectedDate
   );
 
   const upcoming = [...schedule]
-    .filter((item) => item.date >= todayKey)
+    .filter((item) => String(item.date).slice(0, 10) >= todayKey)
     .sort((a, b) => a.date.localeCompare(b.date));
 
   const moveMonth = (amount) => {
@@ -279,7 +303,7 @@ function Calendar() {
           <div className="grid grid-cols-7">
             {calendar.map((cell, index) => {
               const events = cell.date
-                ? schedule.filter((event) => event.date === cell.date)
+                ? schedule.filter((event) => String(event.date).slice(0, 10) === cell.date)
                 : [];
 
               const selected = cell.date === selectedDate;
@@ -317,7 +341,7 @@ function Calendar() {
 
                   <div className="mt-3 space-y-1.5">
                     {events.slice(0, 2).map((event) => {
-                      const info = typeInfo[event.type];
+                      const info = typeInfo[event.type] || typeInfo.reminder;
 
                       return (
                         <div
@@ -390,7 +414,7 @@ function Calendar() {
                 </div>
               ) : (
                 selectedEvents.map((event) => {
-                  const info = typeInfo[event.type];
+                  const info = typeInfo[event.type] || typeInfo.reminder;
                   const Icon = info.icon;
 
                   return (
@@ -447,7 +471,7 @@ function Calendar() {
 
             <div className="mt-4 space-y-2.5">
               {upcoming.slice(0, 4).map((event) => {
-                const info = typeInfo[event.type];
+                const info = typeInfo[event.type] || typeInfo.reminder;
                 const Icon = info.icon;
 
                 return (

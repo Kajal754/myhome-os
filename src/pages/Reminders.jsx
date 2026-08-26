@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Plus,
   Bell,
@@ -106,7 +106,11 @@ const priorityConfig = {
 };
 
 function Reminders() {
-  const [reminders, setReminders] = useState(initialReminders);
+  const storedUser = localStorage.getItem("myhomeUser");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  const userId = user?.id;
+
+  const [reminders, setReminders] = useState([]);
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
@@ -123,6 +127,29 @@ function Reminders() {
     type: "maintenance",
     priority: "Medium",
   });
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const loadReminders = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/reminders?user_id=${userId}`
+        );
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || "Failed to load reminders");
+        }
+
+        setReminders(data.reminders || []);
+      } catch (error) {
+        console.error("LOAD reminders error:", error);
+      }
+    };
+
+    loadReminders();
+  }, [userId]);
 
   const activeReminders = reminders.filter(
     (item) => !item.completed
@@ -156,35 +183,46 @@ function Reminders() {
     });
   }, [activeReminders, search, filter]);
 
-  const completeReminder = (id) => {
-    setReminders((current) =>
-      current.map((reminder) =>
-        reminder.id === id
-          ? {
-              ...reminder,
-              completed: true,
-            }
-          : reminder
-      )
-    );
+  const completeReminder = async (id) => {
+    const reminder = reminders.find((item) => item.id === id);
+    if (!reminder) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/reminders/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...reminder, user_id: userId, completed: true }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message);
+      setReminders((current) => current.map((item) => item.id === id ? { ...item, completed: true } : item));
+    } catch (error) {
+      console.error("COMPLETE reminder error:", error);
+    }
   };
 
-  const handleAddReminder = (event) => {
+  const handleAddReminder = async (event) => {
     event.preventDefault();
 
     if (!newReminder.title.trim() || !newReminder.date) {
       return;
     }
 
-    const reminder = {
-      id: Date.now(),
-      ...newReminder,
-      title: newReminder.title.trim(),
-      dueIn: "New",
-      completed: false,
-    };
+    try {
+      const response = await fetch("http://localhost:5000/api/reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...newReminder, user_id: userId }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message);
 
-    setReminders((current) => [reminder, ...current]);
+      setReminders((current) => [{ ...data.reminder, date: newReminder.date, dueIn: "Upcoming" }, ...current]);
+    } catch (error) {
+      console.error("ADD reminder error:", error);
+      alert("Could not save reminder.");
+      return;
+    }
 
     setNewReminder({
       title: "",
@@ -197,28 +235,43 @@ function Reminders() {
     setShowAdd(false);
   };
 
-  const handleEditReminder = (event) => {
+  const handleEditReminder = async (event) => {
     event.preventDefault();
 
-    setReminders((current) =>
-      current.map((reminder) =>
-        reminder.id === editReminder.id
-          ? editReminder
-          : reminder
-      )
-    );
+    try {
+      const response = await fetch(`http://localhost:5000/api/reminders/${editReminder.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...editReminder, user_id: userId, date: editReminder.date }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message);
+      setReminders((current) => current.map((reminder) => reminder.id === editReminder.id ? { ...editReminder } : reminder));
+    } catch (error) {
+      console.error("EDIT reminder error:", error);
+      alert("Could not update reminder.");
+      return;
+    }
 
     setEditReminder(null);
   };
 
-  const handleDeleteReminder = () => {
+  const handleDeleteReminder = async () => {
     if (!deleteReminder) return;
 
-    setReminders((current) =>
-      current.filter(
-        (reminder) => reminder.id !== deleteReminder.id
-      )
-    );
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/reminders/${deleteReminder.id}?user_id=${userId}`,
+        { method: "DELETE" }
+      );
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message);
+      setReminders((current) => current.filter((reminder) => reminder.id !== deleteReminder.id));
+    } catch (error) {
+      console.error("DELETE reminder error:", error);
+      alert("Could not delete reminder.");
+      return;
+    }
 
     setDeleteReminder(null);
   };

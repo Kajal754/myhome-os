@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   LayoutDashboard,
@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { NavLink } from "react-router-dom";
+import { getDisplayName } from "../../utils/helpers";
 
 const mainMenu = [
   {
@@ -83,6 +84,25 @@ const mainMenu = [
 
 function Sidebar({ mobile = false }) {
   const [showPremium, setShowPremium] = useState(false);
+  const [profileName, setProfileName] = useState(() => {
+    const savedUser = localStorage.getItem("myhomeUser");
+    const user = savedUser ? JSON.parse(savedUser) : null;
+    return getDisplayName(user);
+  });
+
+  useEffect(() => {
+    const updateProfileName = () => {
+      const savedUser = localStorage.getItem("myhomeUser");
+      const user = savedUser ? JSON.parse(savedUser) : null;
+      setProfileName(getDisplayName(user));
+    };
+
+    window.addEventListener("myhome-profile-change", updateProfileName);
+
+    return () => {
+      window.removeEventListener("myhome-profile-change", updateProfileName);
+    };
+  }, []);
 
   return (
     <>
@@ -201,12 +221,12 @@ function Sidebar({ mobile = false }) {
         <div className="border-t border-white/10 p-4">
           <div className="flex items-center gap-3 rounded-xl px-1">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-orange-300 to-blue-400 text-xs font-bold">
-              K
+              {profileName.charAt(0).toUpperCase()}
             </div>
 
             <div className="flex-1">
               <p className="text-xs font-semibold">
-                Kajal
+                {profileName}
               </p>
 
               <p className="text-[10px] text-slate-400">

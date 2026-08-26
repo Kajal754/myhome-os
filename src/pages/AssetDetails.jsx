@@ -13,11 +13,15 @@ import {
   ShieldCheck,
   FileText,
   Loader2,
+  Trash2,
 } from "lucide-react";
 
 function AssetDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const storedUser = localStorage.getItem("myhomeUser");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  const userId = user?.id;
 
   const [asset, setAsset] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -37,6 +41,10 @@ function AssetDetails() {
     image: "",
   });
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [id]);
+
   /* =========================
      LOAD ASSET
   ========================= */
@@ -46,9 +54,8 @@ function AssetDetails() {
       try {
         setLoading(true);
 
-        console.log("SAVE CLICKED", form);
         const response = await fetch(
-          `http://localhost:5000/api/assets/${id}`
+          `http://localhost:5000/api/assets/${id}?user_id=${userId}`
         );
 
         const data = await response.json();
@@ -90,7 +97,7 @@ function AssetDetails() {
     };
 
     loadAsset();
-  }, [id]);
+  }, [id, userId]);
 
   /* =========================
      FORM CHANGE
@@ -148,6 +155,7 @@ const handleSave = async () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          user_id: userId,
           name: form.name,
           category: form.category || null,
           brand: form.brand || null,
@@ -204,6 +212,31 @@ const handleSave = async () => {
     setSaving(false);
   }
 };
+
+  const handleDelete = async () => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete this asset?"
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/assets/${id}?user_id=${userId}`,
+        { method: "DELETE" }
+      );
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to delete asset.");
+      }
+
+      navigate("/assets");
+    } catch (error) {
+      console.error("Delete asset error:", error);
+      alert(error.message || "Could not delete asset.");
+    }
+  };
   /* =========================
      CANCEL EDIT
   ========================= */
@@ -315,13 +348,24 @@ const handleSave = async () => {
 
         <div className="flex gap-2">
           {!editing ? (
-            <button
-              onClick={() => setEditing(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#07172f] px-4 py-2.5 text-xs font-bold text-white shadow-lg transition hover:bg-blue-950"
-            >
-              <Pencil size={14} />
-              Edit Asset
-            </button>
+            <>
+              <button
+                onClick={() => setEditing(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-[#07172f] px-4 py-2.5 text-xs font-bold text-white shadow-lg transition hover:bg-blue-950"
+              >
+                <Pencil size={14} />
+                Edit Asset
+              </button>
+
+              <button
+                onClick={handleDelete}
+                title="Delete asset"
+                className="inline-flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-2.5 text-xs font-bold text-red-500 transition hover:bg-red-100"
+              >
+                <Trash2 size={14} />
+                Delete
+              </button>
+            </>
           ) : (
             <>
               <button
