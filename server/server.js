@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const { Pool } = require("pg");
+const nodemailer = require("nodemailer");
 require("dotenv").config();
 
 const app = express();
@@ -8,7 +9,10 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
-// PostgreSQL connection
+// ==========================================
+// POSTGRESQL
+// ==========================================
+
 const pool = new Pool({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
@@ -16,9 +20,114 @@ const pool = new Pool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
 });
+
 console.log("Connected database:", process.env.DB_NAME);
 
-// Test connection
+pool.on("error", (err) => {
+  console.error("Unexpected PostgreSQL error:", err);
+});
+
+const expensesTableReady = pool.query(`
+  ALTER TABLE expenses
+  ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
+
+  UPDATE expenses
+  SET user_id = (SELECT id FROM users ORDER BY id LIMIT 1)
+  WHERE user_id IS NULL
+`).catch((error) => {
+  console.error("EXPENSES TABLE ERROR:", error);
+  throw error;
+});
+
+const familyTableReady = pool.query(`
+  ALTER TABLE family_members
+  ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
+`).catch((error) => {
+  console.error("FAMILY TABLE ERROR:", error);
+  throw error;
+});
+
+const remindersTableReady = pool.query(`
+  CREATE TABLE IF NOT EXISTS reminders (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT,
+    reminder_date DATE NOT NULL,
+    type TEXT NOT NULL DEFAULT 'other',
+    priority TEXT NOT NULL DEFAULT 'Medium',
+    completed BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )
+  `).catch((error) => {
+    console.error("REMINDERS TABLE ERROR:", error);
+    throw error;
+  });
+
+const providersTableReady = pool.query(`
+  CREATE TABLE IF NOT EXISTS service_providers (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    rating NUMERIC(2,1) NOT NULL DEFAULT 0,
+    last_visit TEXT,
+    visits INTEGER NOT NULL DEFAULT 0,
+    location TEXT,
+    status TEXT NOT NULL DEFAULT 'New',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )
+  `).catch((error) => {
+    console.error("PROVIDERS TABLE ERROR:", error);
+    throw error;
+  });
+
+const maintenanceTableReady = pool.query(`
+  CREATE TABLE IF NOT EXISTS maintenance_records (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    asset TEXT NOT NULL,
+    service TEXT NOT NULL,
+    provider TEXT NOT NULL DEFAULT 'Self',
+    service_date TEXT NOT NULL,
+    cost NUMERIC NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'scheduled',
+    category TEXT NOT NULL DEFAULT 'Home Repair',
+    progress INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )
+`).catch((error) => {
+  console.error("MAINTENANCE TABLE ERROR:", error);
+  throw error;
+});
+
+// ==========================================
+// EMAIL
+// ==========================================
+
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+transporter.verify((error) => {
+  if (error) {
+    console.error("Email error:", error.message);
+  } else {
+    console.log("Email service ready ✅");
+  }
+});
+
+// ==========================================
+// TEST
+// ==========================================
+
 app.get("/api/test", async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
@@ -29,7 +138,7 @@ app.get("/api/test", async (req, res) => {
       time: result.rows[0],
     });
   } catch (error) {
-    console.error("Database connection error:", error);
+    console.error("Database error:", error);
 
     res.status(500).json({
       success: false,
@@ -39,23 +148,327 @@ app.get("/api/test", async (req, res) => {
   }
 });
 
-// GET all assets
-// GET all assets
+// ==========================================
+// AUTH - LOGIN
+// ==========================================
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required",
+      });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    const result = await pool.query(
+      `
+      SELECT id, name, email, password, email_verified
+      FROM users
+      WHERE email = $1
+      LIMIT 1
+      `,
+      [cleanEmail]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Account nahi mila. Please register first.",
+      });
+    }
+
+    const user = result.rows[0];
+
+    if (user.password !== password) {
+      return res.status(401).json({
+        success: false,
+        message: "Email ya password incorrect hai.",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Login successful",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        email_verified: user.email_verified,
+        gender: user.gender,
+      },
+    });
+  } catch (error) {
+    console.error("LOGIN ERROR:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Login failed",
+      error: error.message,
+    });
+  }
+});
+
+// ==========================================
+// AUTH - SEND OTP
+// ==========================================
+
+app.post("/api/auth/send-otp", async (req, res) => {
+  try {
+   const { name, email, password, gender } = req.body;
+
+    if (!name || !email || !password || !gender) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email and password are required",
+      });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    const existingUser = await pool.query(
+      "SELECT id FROM users WHERE email = $1",
+      [cleanEmail]
+    );
+
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "This email is already registered",
+      });
+    }
+
+    const otp = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
+
+    const expiresAt = new Date(
+      Date.now() + 5 * 60 * 1000
+    );
+
+    await pool.query(
+      "DELETE FROM email_otps WHERE email = $1",
+      [cleanEmail]
+    );
+
+    await pool.query(
+      `
+      INSERT INTO email_otps
+      (email, otp, expires_at)
+      VALUES ($1, $2, $3)
+      `,
+      [cleanEmail, otp, expiresAt]
+    );
+
+    console.log("Sending OTP to:", cleanEmail);
+
+    const mailInfo = await transporter.sendMail({
+      from: `"MyHome" <${process.env.EMAIL_USER}>`,
+      to: cleanEmail,
+      subject: "MyHome Email Verification",
+
+      html: `
+        <div style="
+          background:#eef1ec;
+          padding:40px 20px;
+          font-family:Arial;
+        ">
+          <div style="
+            max-width:550px;
+            margin:auto;
+            background:white;
+            padding:40px;
+            border-radius:25px;
+            text-align:center;
+          ">
+
+            <h1 style="color:#20201d;">
+              MyHome
+            </h1>
+
+            <p style="color:#777;">
+              Verify your email address
+            </p>
+
+            <p>
+              Your verification code is:
+            </p>
+
+            <div style="
+              background:#eef1ec;
+              padding:20px;
+              border-radius:15px;
+              display:inline-block;
+              margin:20px;
+            ">
+              <strong style="
+                font-size:34px;
+                letter-spacing:8px;
+              ">
+                ${otp}
+              </strong>
+            </div>
+
+            <p style="color:#777;">
+              This OTP will expire in 5 minutes.
+            </p>
+
+            <p style="
+              color:#aaa;
+              font-size:12px;
+              margin-top:30px;
+            ">
+              If you didn't request this OTP,
+              ignore this email.
+            </p>
+
+          </div>
+        </div>
+      `,
+    });
+
+    console.log("OTP sent successfully ✅");
+    console.log("Message ID:", mailInfo.messageId);
+
+    res.json({
+      success: true,
+      message: "OTP sent successfully",
+    });
+  } catch (error) {
+    console.error("SEND OTP ERROR:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to send OTP",
+      error: error.message,
+    });
+  }
+});
+
+// ==========================================
+// AUTH - VERIFY OTP + REGISTER
+// ==========================================
+
+app.post("/api/auth/verify-otp", async (req, res) => {
+  try {
+    const { name, email, password, gender, otp } = req.body;
+
+    if (!name || !email || !password || !gender || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email, password and OTP are required",
+      });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    const otpResult = await pool.query(
+      `
+      SELECT *
+      FROM email_otps
+      WHERE email = $1
+      AND otp = $2
+      AND expires_at > NOW()
+      ORDER BY id DESC
+      LIMIT 1
+      `,
+      [cleanEmail, otp]
+    );
+
+    if (otpResult.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired OTP",
+      });
+    }
+
+    const existingUser = await pool.query(
+      "SELECT id FROM users WHERE email = $1",
+      [cleanEmail]
+    );
+
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "This email is already registered",
+      });
+    }
+
+    const result = await pool.query(
+      `
+       INSERT INTO users
+  (name, email, password, email_verified, gender)
+  VALUES ($1, $2, $3, $4, $5)
+  RETURNING id, name, email, email_verified, gender
+  `,
+  [
+    name.trim(),
+    cleanEmail,
+    password,
+    true,
+    gender,
+      ]
+    );
+
+    await pool.query(
+      "DELETE FROM email_otps WHERE email = $1",
+      [cleanEmail]
+    );
+
+    res.json({
+      success: true,
+      message: "Registration successful",
+      user: result.rows[0],
+    });
+  } catch (error) {
+    console.error("VERIFY OTP ERROR:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "OTP verification failed",
+      error: error.message,
+    });
+  }
+});
+
+// ==========================================
+// ASSETS - GET USER ASSETS
+// ==========================================
+
 app.get("/api/assets", async (req, res) => {
   try {
+    const { user_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
     const result = await pool.query(
-      "SELECT * FROM assets ORDER BY created_at DESC"
+      `
+      SELECT *
+      FROM assets
+      WHERE user_id = $1
+      ORDER BY created_at DESC
+      `,
+      [user_id]
     );
 
     const assets = result.rows.map((asset) => {
       let image = asset.image || null;
 
       if (asset.image_data) {
-        const imageType = asset.image_type || "image/jpeg";
+        const type = asset.image_type || "image/jpeg";
 
-        image = `data:${imageType};base64,${asset.image_data.toString(
-          "base64"
-        )}`;
+        image =
+          `data:${type};base64,` +
+          asset.image_data.toString("base64");
       }
 
       return {
@@ -64,8 +477,10 @@ app.get("/api/assets", async (req, res) => {
       };
     });
 
-    res.json(assets);
-
+    res.json({
+      success: true,
+      assets,
+    });
   } catch (error) {
     console.error("GET assets error:", error);
 
@@ -77,12 +492,29 @@ app.get("/api/assets", async (req, res) => {
   }
 });
 
-// GET one asset
+// ==========================================
+// ASSETS - GET ONE
+// ==========================================
+
 app.get("/api/assets/:id", async (req, res) => {
   try {
+    const { user_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
     const result = await pool.query(
-      "SELECT * FROM assets WHERE id = $1",
-      [req.params.id]
+      `
+      SELECT *
+      FROM assets
+      WHERE id = $1
+      AND user_id = $2
+      `,
+      [req.params.id, user_id]
     );
 
     if (result.rows.length === 0) {
@@ -92,9 +524,27 @@ app.get("/api/assets/:id", async (req, res) => {
       });
     }
 
-    res.json(result.rows[0]);
+    const asset = result.rows[0];
+
+    let image = asset.image || null;
+
+    if (asset.image_data) {
+      const type = asset.image_type || "image/jpeg";
+
+      image =
+        `data:${type};base64,` +
+        asset.image_data.toString("base64");
+    }
+
+    res.json({
+      success: true,
+      asset: {
+        ...asset,
+        image,
+      },
+    });
   } catch (error) {
-    console.error("GET single asset error:", error);
+    console.error("GET asset error:", error);
 
     res.status(500).json({
       success: false,
@@ -104,18 +554,14 @@ app.get("/api/assets/:id", async (req, res) => {
   }
 });
 
-// ADD asset
-// ADD asset
-// ADD asset
-// ADD asset
-// ADD asset
-// ADD asset
+// ==========================================
+// ASSETS - ADD
+// ==========================================
 
 app.post("/api/assets", async (req, res) => {
-  console.log("POST ASSET HIT");
-console.log("IMAGE:", req.body.image ? "YES" : "NO");
   try {
     const {
+      user_id,
       name,
       category,
       brand,
@@ -129,7 +575,13 @@ console.log("IMAGE:", req.body.image ? "YES" : "NO");
       image_type,
     } = req.body;
 
-    // Name required
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
     if (!name || !name.trim()) {
       return res.status(400).json({
         success: false,
@@ -137,9 +589,13 @@ console.log("IMAGE:", req.body.image ? "YES" : "NO");
       });
     }
 
-    // Image data
+    const cleanPrice = price
+      ? Number(String(price).replace(/[₹,\s]/g, ""))
+      : 0;
+
     let imageData = null;
     let imageType = image_type || "image/jpeg";
+    let imageValue = image || null;
 
     if (image && image.startsWith("data:image/")) {
       const match = image.match(
@@ -157,15 +613,11 @@ console.log("IMAGE:", req.body.image ? "YES" : "NO");
       imageData = Buffer.from(match[2], "base64");
     }
 
-    // Price clean
-    const cleanPrice = price
-      ? Number(String(price).replace(/[₹,\s]/g, ""))
-      : 0;
-
-    // Insert into database
     const result = await pool.query(
       `
-      INSERT INTO assets (
+      INSERT INTO assets
+      (
+        user_id,
         name,
         category,
         brand,
@@ -179,13 +631,15 @@ console.log("IMAGE:", req.body.image ? "YES" : "NO");
         image_data,
         image_type
       )
-      VALUES (
-  $1, $2, $3, $4, $5,
-  $6, $7, $8, $9, $10, $11, $12
-)
+      VALUES
+      (
+        $1,$2,$3,$4,$5,$6,$7,
+        $8,$9,$10,$11,$12,$13
+      )
       RETURNING *
       `,
       [
+        user_id,
         name.trim(),
         category || null,
         brand || null,
@@ -195,7 +649,7 @@ console.log("IMAGE:", req.body.image ? "YES" : "NO");
         warranty || null,
         location || null,
         description || null,
-        image || null,
+        imageValue,
         imageData,
         imageType,
       ]
@@ -203,7 +657,6 @@ console.log("IMAGE:", req.body.image ? "YES" : "NO");
 
     const asset = result.rows[0];
 
-    // Convert image back to base64 for frontend
     let responseImage = asset.image || null;
 
     if (asset.image_data) {
@@ -222,7 +675,6 @@ console.log("IMAGE:", req.body.image ? "YES" : "NO");
         image: responseImage,
       },
     });
-
   } catch (error) {
     console.error("ADD asset error:", error);
 
@@ -234,11 +686,14 @@ console.log("IMAGE:", req.body.image ? "YES" : "NO");
   }
 });
 
+// ==========================================
+// ASSETS - UPDATE
+// ==========================================
 
-// UPDATE asset
 app.put("/api/assets/:id", async (req, res) => {
   try {
     const {
+      user_id,
       name,
       category,
       brand,
@@ -252,6 +707,13 @@ app.put("/api/assets/:id", async (req, res) => {
       image_type,
     } = req.body;
 
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
     if (!name || !name.trim()) {
       return res.status(400).json({
         success: false,
@@ -259,10 +721,14 @@ app.put("/api/assets/:id", async (req, res) => {
       });
     }
 
-    // Existing asset check
     const existingResult = await pool.query(
-      "SELECT * FROM assets WHERE id = $1",
-      [req.params.id]
+      `
+      SELECT *
+      FROM assets
+      WHERE id = $1
+      AND user_id = $2
+      `,
+      [req.params.id, user_id]
     );
 
     if (existingResult.rows.length === 0) {
@@ -274,11 +740,11 @@ app.put("/api/assets/:id", async (req, res) => {
 
     const existingAsset = existingResult.rows[0];
 
-    // Keep old image by default
     let imageData = existingAsset.image_data;
-    let imageType = existingAsset.image_type;
+    let imageType =
+      existingAsset.image_type || "image/jpeg";
+    let imageValue = existingAsset.image || null;
 
-    // If a new image was uploaded
     if (image && image.startsWith("data:image/")) {
       const match = image.match(
         /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/
@@ -293,8 +759,9 @@ app.put("/api/assets/:id", async (req, res) => {
 
       imageType = match[1];
       imageData = Buffer.from(match[2], "base64");
+      imageValue = image;
     }
-console.log("IMAGE RECEIVED:", image ? image.substring(0, 50) : "NO IMAGE");
+
     const cleanPrice = price
       ? Number(String(price).replace(/[₹,\s]/g, ""))
       : 0;
@@ -312,9 +779,11 @@ console.log("IMAGE RECEIVED:", image ? image.substring(0, 50) : "NO IMAGE");
         warranty = $7,
         location = $8,
         description = $9,
-        image_data = $10,
-        image_type = $11
-      WHERE id = $12
+        image = $10,
+        image_data = $11,
+        image_type = $12
+      WHERE id = $13
+      AND user_id = $14
       RETURNING *
       `,
       [
@@ -327,9 +796,11 @@ console.log("IMAGE RECEIVED:", image ? image.substring(0, 50) : "NO IMAGE");
         warranty || null,
         location || null,
         description || null,
+        imageValue,
         imageData,
         imageType,
         req.params.id,
+        user_id,
       ]
     );
 
@@ -340,9 +811,9 @@ console.log("IMAGE RECEIVED:", image ? image.substring(0, 50) : "NO IMAGE");
     if (asset.image_data) {
       const type = asset.image_type || "image/jpeg";
 
-      responseImage = `data:${type};base64,${asset.image_data.toString(
-        "base64"
-      )}`;
+      responseImage =
+        `data:${type};base64,` +
+        asset.image_data.toString("base64");
     }
 
     res.json({
@@ -353,7 +824,6 @@ console.log("IMAGE RECEIVED:", image ? image.substring(0, 50) : "NO IMAGE");
         image: responseImage,
       },
     });
-
   } catch (error) {
     console.error("UPDATE asset error:", error);
 
@@ -364,14 +834,133 @@ console.log("IMAGE RECEIVED:", image ? image.substring(0, 50) : "NO IMAGE");
     });
   }
 });
-// ===============================
-// DOCUMENTS - GET ALL
-// ===============================
+
+// ==========================================
+// ASSETS - DELETE + HISTORY
+// ==========================================
+
+app.delete("/api/assets/:id", async (req, res) => {
+  try {
+    const { user_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
+    const assetResult = await pool.query(
+      `
+      SELECT *
+      FROM assets
+      WHERE id = $1
+      AND user_id = $2
+      `,
+      [req.params.id, user_id]
+    );
+
+    if (assetResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Asset not found",
+      });
+    }
+
+    const asset = assetResult.rows[0];
+
+    await pool.query(
+      `
+      INSERT INTO asset_history
+      (
+        asset_id,
+        action,
+        name,
+        category,
+        brand,
+        model,
+        price,
+        purchase_date,
+        warranty,
+        location,
+        description,
+        image,
+        image_data,
+        image_type
+      )
+      VALUES
+      (
+        $1,$2,$3,$4,$5,$6,$7,
+        $8,$9,$10,$11,$12,$13,$14
+      )
+      `,
+      [
+        asset.id,
+        "DELETE",
+        asset.name,
+        asset.category,
+        asset.brand,
+        asset.model,
+        asset.price,
+        asset.purchase_date,
+        asset.warranty,
+        asset.location,
+        asset.description,
+        asset.image,
+        asset.image_data,
+        asset.image_type,
+      ]
+    );
+
+    const result = await pool.query(
+      `
+      DELETE FROM assets
+      WHERE id = $1
+      AND user_id = $2
+      RETURNING *
+      `,
+      [req.params.id, user_id]
+    );
+
+    res.json({
+      success: true,
+      message: "Asset deleted successfully",
+      asset: result.rows[0],
+    });
+  } catch (error) {
+    console.error("DELETE asset error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete asset",
+      error: error.message,
+    });
+  }
+});
+
+// ==========================================
+// DOCUMENTS - GET USER DOCUMENTS
+// ==========================================
 
 app.get("/api/documents", async (req, res) => {
   try {
+    const { user_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
     const result = await pool.query(
-      "SELECT * FROM documents ORDER BY created_at DESC"
+      `
+      SELECT *
+      FROM documents
+      WHERE user_id = $1
+      ORDER BY created_at DESC
+      `,
+      [user_id]
     );
 
     const documents = result.rows.map((doc) => {
@@ -392,8 +981,10 @@ app.get("/api/documents", async (req, res) => {
       };
     });
 
-    res.json(documents);
-
+    res.json({
+      success: true,
+      documents,
+    });
   } catch (error) {
     console.error("GET documents error:", error);
 
@@ -405,14 +996,77 @@ app.get("/api/documents", async (req, res) => {
   }
 });
 
+// ==========================================
+// DOCUMENTS - GET ONE
+// ==========================================
 
-// ===============================
+app.get("/api/documents/:id", async (req, res) => {
+  try {
+    const { user_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT *
+      FROM documents
+      WHERE id = $1
+      AND user_id = $2
+      `,
+      [req.params.id, user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found",
+      });
+    }
+
+    const doc = result.rows[0];
+
+    let image = doc.image || null;
+
+    if (doc.image_data) {
+      const type = doc.image_type || "image/jpeg";
+
+      image =
+        `data:${type};base64,` +
+        doc.image_data.toString("base64");
+    }
+
+    res.json({
+      success: true,
+      document: {
+        ...doc,
+        documentNo: doc.document_no,
+        image,
+      },
+    });
+  } catch (error) {
+    console.error("GET document error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to load document",
+      error: error.message,
+    });
+  }
+});
+
+// ==========================================
 // DOCUMENTS - ADD
-// ===============================
+// ==========================================
 
 app.post("/api/documents", async (req, res) => {
   try {
     const {
+      user_id,
       name,
       category,
       holder,
@@ -425,6 +1079,13 @@ app.post("/api/documents", async (req, res) => {
       icon,
     } = req.body;
 
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
     if (!name || !name.trim()) {
       return res.status(400).json({
         success: false,
@@ -435,7 +1096,6 @@ app.post("/api/documents", async (req, res) => {
     let imageData = null;
     let imageType = image_type || "image/jpeg";
 
-    // Convert base64 image into Buffer
     if (image && image.startsWith("data:image/")) {
       const match = image.match(
         /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/
@@ -454,7 +1114,9 @@ app.post("/api/documents", async (req, res) => {
 
     const result = await pool.query(
       `
-      INSERT INTO documents (
+      INSERT INTO documents
+      (
+        user_id,
         name,
         category,
         holder,
@@ -467,13 +1129,15 @@ app.post("/api/documents", async (req, res) => {
         image_type,
         icon
       )
-      VALUES (
-        $1,$2,$3,$4,$5,
-        $6,$7,$8,$9,$10,$11
+      VALUES
+      (
+        $1,$2,$3,$4,$5,$6,
+        $7,$8,$9,$10,$11,$12
       )
       RETURNING *
       `,
       [
+        user_id,
         name.trim(),
         category || null,
         holder || null,
@@ -509,7 +1173,6 @@ app.post("/api/documents", async (req, res) => {
         image: responseImage,
       },
     });
-
   } catch (error) {
     console.error("ADD document error:", error);
 
@@ -521,99 +1184,14 @@ app.post("/api/documents", async (req, res) => {
   }
 });
 
-// ===============================
-// DOCUMENTS - DELETE
-// ===============================
-
-app.delete("/api/documents/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const documentResult = await pool.query(
-      "SELECT * FROM documents WHERE id = $1",
-      [id]
-    );
-
-    if (documentResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Document not found",
-      });
-    }
-
-    const doc = documentResult.rows[0];
-
-    await pool.query(
-      `
-      INSERT INTO document_history (
-        document_id,
-        action,
-        name,
-        category,
-        holder,
-        document_no,
-        added,
-        expiry,
-        status,
-        image,
-        image_data,
-        image_type,
-        icon
-      )
-      VALUES (
-        $1,$2,$3,$4,$5,$6,
-        $7,$8,$9,$10,$11,$12,$13
-      )
-      `,
-      [
-        doc.id,
-        "DELETE",
-        doc.name,
-        doc.category,
-        doc.holder,
-        doc.document_no,
-        doc.added,
-        doc.expiry,
-        doc.status,
-        doc.image,
-        doc.image_data,
-        doc.image_type,
-        null,
-      ]
-    );
-
-    const result = await pool.query(
-      "DELETE FROM documents WHERE id = $1 RETURNING *",
-      [id]
-    );
-
-    res.json({
-      success: true,
-      message: "Document deleted successfully",
-      document: result.rows[0],
-    });
-
-  } catch (error) {
-    console.error("DELETE document error:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to delete document",
-      error: error.message,
-    });
-  }
-});
-
-
-// ISKE BAAD tumhara purana code 👇
 // ==========================================
-// UPDATE DOCUMENT
+// DOCUMENTS - UPDATE
 // ==========================================
 
 app.put("/api/documents/:id", async (req, res) => {
-  console.log("UPDATE DOCUMENT ROUTE HIT, ID:", req.params.id);
   try {
     const {
+      user_id,
       name,
       category,
       holder,
@@ -623,6 +1201,13 @@ app.put("/api/documents/:id", async (req, res) => {
       status,
       image,
     } = req.body;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
 
     const result = await pool.query(
       `
@@ -635,8 +1220,10 @@ app.put("/api/documents/:id", async (req, res) => {
         added = $5,
         expiry = $6,
         status = $7,
-        image = $8
+        image = $8,
+        updated_at = CURRENT_TIMESTAMP
       WHERE id = $9
+      AND user_id = $10
       RETURNING *
       `,
       [
@@ -649,6 +1236,7 @@ app.put("/api/documents/:id", async (req, res) => {
         status || null,
         image || null,
         req.params.id,
+        user_id,
       ]
     );
 
@@ -664,7 +1252,6 @@ app.put("/api/documents/:id", async (req, res) => {
       message: "Document updated successfully",
       document: result.rows[0],
     });
-
   } catch (error) {
     console.error("UPDATE document error:", error);
 
@@ -674,95 +1261,130 @@ app.put("/api/documents/:id", async (req, res) => {
       error: error.message,
     });
   }
-  
 });
-// DELETE asset
-// DELETE asset
-app.delete("/api/assets/:id", async (req, res) => {
-  console.log("DELETE REQUEST RECEIVED, ID:", req.params.id);
 
+// ==========================================
+// DOCUMENTS - DELETE + HISTORY
+// ==========================================
+
+app.delete("/api/documents/:id", async (req, res) => {
   try {
-    // 1. Delete karne se pehle asset ka complete data nikalo
-    const assetResult = await pool.query(
-      "SELECT * FROM assets WHERE id = $1",
-      [req.params.id]
-    );
+    const { user_id } = req.query;
 
-    if (assetResult.rows.length === 0) {
-      return res.status(404).json({
+    if (!user_id) {
+      return res.status(400).json({
         success: false,
-        message: "Asset not found",
+        message: "User ID is required",
       });
     }
 
-    const asset = assetResult.rows[0];
+    const documentResult = await pool.query(
+      `
+      SELECT *
+      FROM documents
+      WHERE id = $1
+      AND user_id = $2
+      `,
+      [req.params.id, user_id]
+    );
 
-    // 2. DELETE ka complete record history mein save karo
+    if (documentResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found",
+      });
+    }
+
+    const doc = documentResult.rows[0];
+
     await pool.query(
       `
-      INSERT INTO asset_history (
-        asset_id,
+      INSERT INTO document_history
+      (
+        document_id,
         action,
         name,
         category,
-        brand,
-        model,
-        price,
-        purchase_date,
-        warranty,
-        location,
-        description,
-        image
+        holder,
+        document_no,
+        added,
+        expiry,
+        status,
+        image,
+        image_data,
+        image_type,
+        icon
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+      VALUES
+      (
+        $1,$2,$3,$4,$5,$6,$7,
+        $8,$9,$10,$11,$12,$13
+      )
       `,
       [
-        asset.id,
+        doc.id,
         "DELETE",
-        asset.name,
-        asset.category,
-        asset.brand,
-        asset.model,
-        asset.price,
-        asset.purchase_date,
-        asset.warranty,
-        asset.location,
-        asset.description,
-        asset.image,
+        doc.name,
+        doc.category,
+        doc.holder,
+        doc.document_no,
+        doc.added,
+        doc.expiry,
+        doc.status,
+        doc.image,
+        doc.image_data,
+        doc.image_type,
+        doc.icon,
       ]
     );
 
-    // 3. Ab assets table se asset delete karo
     const result = await pool.query(
-      "DELETE FROM assets WHERE id = $1 RETURNING *",
-      [req.params.id]
+      `
+      DELETE FROM documents
+      WHERE id = $1
+      AND user_id = $2
+      RETURNING *
+      `,
+      [req.params.id, user_id]
     );
 
     res.json({
       success: true,
-      message: "Asset deleted successfully",
-      asset: result.rows[0],
+      message: "Document deleted successfully",
+      document: result.rows[0],
     });
-
   } catch (error) {
-    console.error("DELETE asset error:", error);
+    console.error("DELETE document error:", error);
 
     res.status(500).json({
       success: false,
-      message: "Failed to delete asset",
+      message: "Failed to delete document",
       error: error.message,
     });
   }
 });
 
 // ==========================================
-// EXPENSES - GET ALL
+// EXPENSES - GET
 // ==========================================
 
 app.get("/api/expenses", async (req, res) => {
   try {
+    await expensesTableReady;
+    const { user_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
     const result = await pool.query(
-      "SELECT * FROM expenses ORDER BY date DESC, id DESC"
+      `
+      SELECT *
+      FROM expenses
+      WHERE user_id = $1
+      ORDER BY date DESC, id DESC
+      `,
+      [user_id]
     );
 
     res.json({
@@ -780,14 +1402,15 @@ app.get("/api/expenses", async (req, res) => {
   }
 });
 
-
 // ==========================================
 // EXPENSES - ADD
 // ==========================================
 
 app.post("/api/expenses", async (req, res) => {
   try {
+    await expensesTableReady;
     const {
+      user_id,
       title,
       amount,
       category,
@@ -795,7 +1418,7 @@ app.post("/api/expenses", async (req, res) => {
       description,
     } = req.body;
 
-    if (!title || !title.trim()) {
+    if (!user_id || !title || !title.trim()) {
       return res.status(400).json({
         success: false,
         message: "Expense title is required",
@@ -810,16 +1433,18 @@ app.post("/api/expenses", async (req, res) => {
       `
       INSERT INTO expenses
       (
+        user_id,
         title,
         amount,
         category,
         date,
         description
       )
-      VALUES ($1, $2, $3, $4, $5)
+      VALUES ($1,$2,$3,$4,$5,$6)
       RETURNING *
       `,
       [
+        user_id,
         title.trim(),
         cleanAmount,
         category || null,
@@ -833,7 +1458,6 @@ app.post("/api/expenses", async (req, res) => {
       message: "Expense added successfully",
       expense: result.rows[0],
     });
-
   } catch (error) {
     console.error("ADD expense error:", error);
 
@@ -845,21 +1469,21 @@ app.post("/api/expenses", async (req, res) => {
   }
 });
 
-
 // ==========================================
 // EXPENSES - UPDATE
 // ==========================================
 
 app.put("/api/expenses/:id", async (req, res) => {
   try {
-    const { title, amount, category, date, description } = req.body;
-
-    if (!title || !title.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Expense title is required",
-      });
-    }
+    await expensesTableReady;
+    const {
+      user_id,
+      title,
+      amount,
+      category,
+      date,
+      description,
+    } = req.body;
 
     const cleanAmount = amount
       ? Number(String(amount).replace(/[₹,\s]/g, ""))
@@ -874,16 +1498,17 @@ app.put("/api/expenses/:id", async (req, res) => {
         category = $3,
         date = $4,
         description = $5
-      WHERE id = $6
+      WHERE id = $6 AND user_id = $7
       RETURNING *
       `,
       [
-        title.trim(),
+        title?.trim() || null,
         cleanAmount,
         category || null,
         date || null,
         description || null,
         req.params.id,
+        user_id,
       ]
     );
 
@@ -899,7 +1524,6 @@ app.put("/api/expenses/:id", async (req, res) => {
       message: "Expense updated successfully",
       expense: result.rows[0],
     });
-
   } catch (error) {
     console.error("UPDATE expense error:", error);
 
@@ -911,19 +1535,23 @@ app.put("/api/expenses/:id", async (req, res) => {
   }
 });
 
-
 // ==========================================
 // EXPENSES - DELETE + HISTORY
 // ==========================================
 
 app.delete("/api/expenses/:id", async (req, res) => {
   try {
+    await expensesTableReady;
     const { id } = req.params;
+    const { user_id } = req.query;
 
-    // 1. Pehle expense ka data nikalo
+    if (!user_id) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
     const expenseResult = await pool.query(
-      "SELECT * FROM expenses WHERE id = $1",
-      [id]
+      "SELECT * FROM expenses WHERE id = $1 AND user_id = $2",
+      [id, user_id]
     );
 
     if (expenseResult.rows.length === 0) {
@@ -935,7 +1563,6 @@ app.delete("/api/expenses/:id", async (req, res) => {
 
     const expense = expenseResult.rows[0];
 
-    // 2. Delete hone wale expense ko history mein save karo
     await pool.query(
       `
       INSERT INTO expense_history
@@ -948,7 +1575,7 @@ app.delete("/api/expenses/:id", async (req, res) => {
         date,
         description
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1,$2,$3,$4,$5,$6,$7)
       `,
       [
         expense.id,
@@ -961,10 +1588,9 @@ app.delete("/api/expenses/:id", async (req, res) => {
       ]
     );
 
-    // 3. Main expenses table se delete karo
     const result = await pool.query(
-      "DELETE FROM expenses WHERE id = $1 RETURNING *",
-      [id]
+      "DELETE FROM expenses WHERE id = $1 AND user_id = $2 RETURNING *",
+      [id, user_id]
     );
 
     res.json({
@@ -972,7 +1598,6 @@ app.delete("/api/expenses/:id", async (req, res) => {
       message: "Expense deleted successfully",
       expense: result.rows[0],
     });
-
   } catch (error) {
     console.error("DELETE expense error:", error);
 
@@ -984,22 +1609,24 @@ app.delete("/api/expenses/:id", async (req, res) => {
   }
 });
 
-
 // ==========================================
-// EXPENSES - DELETED HISTORY
+// EXPENSES - HISTORY
 // ==========================================
 
 app.get("/api/expenses/history", async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT * FROM expense_history ORDER BY deleted_at DESC, id DESC"
+      `
+      SELECT *
+      FROM expense_history
+      ORDER BY deleted_at DESC, id DESC
+      `
     );
 
     res.json({
       success: true,
       history: result.rows,
     });
-
   } catch (error) {
     console.error("GET expense history error:", error);
 
@@ -1010,15 +1637,31 @@ app.get("/api/expenses/history", async (req, res) => {
     });
   }
 });
+
 // ==========================================
-// FAMILY MEMBERS API
+// FAMILY MEMBERS
 // ==========================================
 
-// GET all family members
 app.get("/api/family-members", async (req, res) => {
   try {
+    await familyTableReady;
+    const { user_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
     const result = await pool.query(
-      "SELECT * FROM family_members ORDER BY id DESC"
+      `
+      SELECT *
+      FROM family_members
+      WHERE user_id = $1
+      ORDER BY id DESC
+      `,
+      [user_id]
     );
 
     res.json({
@@ -1036,58 +1679,15 @@ app.get("/api/family-members", async (req, res) => {
   }
 });
 
-
-// ADD family member
-app.post("/api/family-members", async (req, res) => {
-  try {
-    const {
-      name,
-      email,
-      role,
-      status,
-      joined,
-      avatar,
-    } = req.body;
-
-    const result = await pool.query(
-      `
-      INSERT INTO family_members
-      (name, email, role, status, joined, avatar)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING *
-      `,
-      [
-        name || null,
-        email || null,
-        role || null,
-        status || null,
-        joined || null,
-        avatar || null,
-      ]
-    );
-
-    res.json({
-      success: true,
-      message: "Family member added successfully",
-      member: result.rows[0],
-    });
-  } catch (error) {
-    console.error("ADD family member error:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to add family member",
-      error: error.message,
-    });
-  }
-});
 // ==========================================
 // ADD FAMILY MEMBER
 // ==========================================
 
 app.post("/api/family-members", async (req, res) => {
   try {
+    await familyTableReady;
     const {
+      user_id,
       name,
       email,
       role,
@@ -1096,10 +1696,18 @@ app.post("/api/family-members", async (req, res) => {
       avatar,
     } = req.body;
 
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
     const result = await pool.query(
       `
       INSERT INTO family_members
       (
+        user_id,
         name,
         email,
         role,
@@ -1107,10 +1715,11 @@ app.post("/api/family-members", async (req, res) => {
         joined,
         avatar
       )
-      VALUES ($1, $2, $3, $4, $5, $6)
+      VALUES ($1,$2,$3,$4,$5,$6,$7)
       RETURNING *
       `,
       [
+        user_id,
         name || null,
         email || null,
         role || "Member",
@@ -1125,7 +1734,6 @@ app.post("/api/family-members", async (req, res) => {
       message: "Family member added successfully",
       member: result.rows[0],
     });
-
   } catch (error) {
     console.error("ADD FAMILY MEMBER ERROR:", error);
 
@@ -1137,12 +1745,15 @@ app.post("/api/family-members", async (req, res) => {
   }
 });
 
+// ==========================================
+// UPDATE FAMILY MEMBER
+// ==========================================
 
-
-// UPDATE family member
 app.put("/api/family-members/:id", async (req, res) => {
   try {
+    await familyTableReady;
     const {
+      user_id,
       name,
       email,
       role,
@@ -1150,6 +1761,13 @@ app.put("/api/family-members/:id", async (req, res) => {
       joined,
       avatar,
     } = req.body;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
 
     const result = await pool.query(
       `
@@ -1162,7 +1780,7 @@ app.put("/api/family-members/:id", async (req, res) => {
         joined = $5,
         avatar = $6,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $7
+      WHERE id = $7 AND user_id = $8
       RETURNING *
       `,
       [
@@ -1173,6 +1791,7 @@ app.put("/api/family-members/:id", async (req, res) => {
         joined || null,
         avatar || null,
         req.params.id,
+        user_id,
       ]
     );
 
@@ -1199,13 +1818,25 @@ app.put("/api/family-members/:id", async (req, res) => {
   }
 });
 
+// ==========================================
+// DELETE FAMILY MEMBER
+// ==========================================
 
-// DELETE family member + save history
 app.delete("/api/family-members/:id", async (req, res) => {
   try {
+    await familyTableReady;
+    const { user_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
     const memberResult = await pool.query(
-      "SELECT * FROM family_members WHERE id = $1",
-      [req.params.id]
+      "SELECT * FROM family_members WHERE id = $1 AND user_id = $2",
+      [req.params.id, user_id]
     );
 
     if (memberResult.rows.length === 0) {
@@ -1217,7 +1848,6 @@ app.delete("/api/family-members/:id", async (req, res) => {
 
     const member = memberResult.rows[0];
 
-    // Save deleted member's complete data in history
     await pool.query(
       `
       INSERT INTO family_member_history
@@ -1231,7 +1861,7 @@ app.delete("/api/family-members/:id", async (req, res) => {
         joined,
         avatar
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
       `,
       [
         member.id,
@@ -1245,10 +1875,13 @@ app.delete("/api/family-members/:id", async (req, res) => {
       ]
     );
 
-    // Delete from main table
     const result = await pool.query(
-      "DELETE FROM family_members WHERE id = $1 RETURNING *",
-      [req.params.id]
+      `
+      DELETE FROM family_members
+      WHERE id = $1 AND user_id = $2
+      RETURNING *
+      `,
+      [req.params.id, user_id]
     );
 
     res.json({
@@ -1266,22 +1899,38 @@ app.delete("/api/family-members/:id", async (req, res) => {
     });
   }
 });
+
 // ==========================================
-// SETTINGS - GET
+// SETTINGS - GET USER SETTINGS
 // ==========================================
 
 app.get("/api/settings", async (req, res) => {
   try {
+    const { user_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
     let result = await pool.query(
-      "SELECT * FROM user_settings ORDER BY id ASC LIMIT 1"
+      `
+      SELECT *
+      FROM user_settings
+      WHERE user_id = $1
+      LIMIT 1
+      `,
+      [user_id]
     );
 
-    // Agar settings ka record nahi hai to default create karo
     if (result.rows.length === 0) {
       result = await pool.query(
         `
         INSERT INTO user_settings
         (
+          user_id,
           name,
           email,
           photo,
@@ -1290,12 +1939,13 @@ app.get("/api/settings", async (req, res) => {
           maintenance_alerts,
           theme
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        SELECT id, name, email, $2, $3, $4, $5, $6
+        FROM users
+        WHERE id = $1
         RETURNING *
         `,
         [
-          "Miss Kajal",
-          "kajal@example.com",
+          user_id,
           null,
           true,
           true,
@@ -1309,7 +1959,6 @@ app.get("/api/settings", async (req, res) => {
       success: true,
       settings: result.rows[0],
     });
-
   } catch (error) {
     console.error("GET SETTINGS ERROR:", error);
 
@@ -1321,7 +1970,6 @@ app.get("/api/settings", async (req, res) => {
   }
 });
 
-
 // ==========================================
 // SETTINGS - UPDATE
 // ==========================================
@@ -1329,6 +1977,7 @@ app.get("/api/settings", async (req, res) => {
 app.put("/api/settings", async (req, res) => {
   try {
     const {
+      user_id,
       name,
       email,
       photo,
@@ -1337,6 +1986,13 @@ app.put("/api/settings", async (req, res) => {
       maintenance_alerts,
       theme,
     } = req.body;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
 
     const result = await pool.query(
       `
@@ -1350,12 +2006,7 @@ app.put("/api/settings", async (req, res) => {
         maintenance_alerts = $6,
         theme = $7,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = (
-        SELECT id
-        FROM user_settings
-        ORDER BY id ASC
-        LIMIT 1
-      )
+      WHERE user_id = $8
       RETURNING *
       `,
       [
@@ -1366,15 +2017,22 @@ app.put("/api/settings", async (req, res) => {
         warranty_alerts ?? true,
         maintenance_alerts ?? true,
         theme || "light",
+        user_id,
       ]
     );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Settings not found",
+      });
+    }
 
     res.json({
       success: true,
       message: "Settings updated successfully",
       settings: result.rows[0],
     });
-
   } catch (error) {
     console.error("UPDATE SETTINGS ERROR:", error);
 
@@ -1385,6 +2043,259 @@ app.put("/api/settings", async (req, res) => {
     });
   }
 });
+
+app.delete("/api/settings/account", async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const { user_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
+    await client.query("BEGIN");
+
+    await client.query(
+      "DELETE FROM asset_history WHERE asset_id IN (SELECT id FROM assets WHERE user_id = $1)",
+      [user_id]
+    );
+    await client.query(
+      "DELETE FROM document_history WHERE document_id IN (SELECT id FROM documents WHERE user_id = $1)",
+      [user_id]
+    );
+    await client.query(
+      "DELETE FROM family_member_history WHERE member_id IN (SELECT id FROM family_members WHERE user_id = $1)",
+      [user_id]
+    );
+    await client.query(
+      "DELETE FROM expense_history WHERE expense_id IN (SELECT id FROM expenses WHERE user_id = $1)",
+      [user_id]
+    );
+
+    const tables = [
+      "user_settings",
+      "family_members",
+      "reminders",
+      "service_providers",
+      "maintenance_records",
+      "expenses",
+      "documents",
+      "assets",
+    ];
+
+    for (const table of tables) {
+      await client.query(`DELETE FROM ${table} WHERE user_id = $1`, [user_id]);
+    }
+
+    const result = await client.query(
+      "DELETE FROM users WHERE id = $1 RETURNING id",
+      [user_id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: "Account not found" });
+    }
+
+    await client.query("COMMIT");
+
+    res.json({ success: true, message: "Account deleted successfully" });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("DELETE ACCOUNT ERROR:", error);
+    res.status(500).json({ success: false, message: "Failed to delete account" });
+  } finally {
+    client.release();
+  }
+});
+
+// ==========================================
+// SERVER
+// ==========================================
+
+app.get("/api/service-providers", async (req, res) => {
+  try {
+    await providersTableReady;
+    const { user_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
+    const result = await pool.query(
+      `SELECT * FROM service_providers
+       WHERE user_id = $1 ORDER BY created_at DESC`,
+      [user_id]
+    );
+
+    res.json({ success: true, providers: result.rows });
+  } catch (error) {
+    console.error("GET service providers error:", error);
+    res.status(500).json({ success: false, message: "Failed to load service providers" });
+  }
+});
+
+app.post("/api/service-providers", async (req, res) => {
+  try {
+    await providersTableReady;
+    const {
+      user_id,
+      name,
+      category,
+      phone,
+      rating,
+      last_visit,
+      location,
+    } = req.body;
+
+    if (!user_id || !name?.trim() || !category || !phone?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID, name, category and phone are required",
+      });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO service_providers
+       (user_id, name, category, phone, rating, last_visit, location)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [user_id, name.trim(), category, phone.trim(), Number(rating) || 0, last_visit || null, location || null]
+    );
+
+    res.status(201).json({ success: true, provider: result.rows[0] });
+  } catch (error) {
+    console.error("ADD service provider error:", error);
+    res.status(500).json({ success: false, message: "Failed to save service provider" });
+  }
+});
+
+app.put("/api/service-providers/:id", async (req, res) => {
+  try {
+    await providersTableReady;
+    const {
+      user_id,
+      name,
+      category,
+      phone,
+      rating,
+      last_visit,
+      visits,
+      location,
+      status,
+    } = req.body;
+
+    const result = await pool.query(
+      `UPDATE service_providers
+       SET name = $1, category = $2, phone = $3, rating = $4,
+           last_visit = $5, visits = $6, location = $7, status = $8
+       WHERE id = $9 AND user_id = $10 RETURNING *`,
+      [name?.trim(), category, phone?.trim(), Number(rating) || 0, last_visit || null, Number(visits) || 0, location || null, status || "New", req.params.id, user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Service provider not found" });
+    }
+
+    res.json({ success: true, provider: result.rows[0] });
+  } catch (error) {
+    console.error("UPDATE service provider error:", error);
+    res.status(500).json({ success: false, message: "Failed to update service provider" });
+  }
+});
+
+app.delete("/api/service-providers/:id", async (req, res) => {
+  try {
+    await providersTableReady;
+    const result = await pool.query(
+      `DELETE FROM service_providers
+       WHERE id = $1 AND user_id = $2 RETURNING id`,
+      [req.params.id, req.query.user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Service provider not found" });
+    }
+
+    res.json({ success: true, message: "Service provider deleted" });
+  } catch (error) {
+    console.error("DELETE service provider error:", error);
+    res.status(500).json({ success: false, message: "Failed to delete service provider" });
+  }
+});
+
+app.get("/api/maintenance", async (req, res) => {
+  try {
+    await maintenanceTableReady;
+    const { user_id } = req.query;
+    if (!user_id) return res.status(400).json({ success: false, message: "User ID is required" });
+
+    const result = await pool.query(
+      `SELECT id, asset, service, provider, service_date AS date, cost, status, category, progress
+       FROM maintenance_records WHERE user_id = $1 ORDER BY id DESC`,
+      [user_id]
+    );
+    res.json({ success: true, records: result.rows });
+  } catch (error) {
+    console.error("GET maintenance error:", error);
+    res.status(500).json({ success: false, message: "Failed to load maintenance" });
+  }
+});
+
+app.post("/api/maintenance", async (req, res) => {
+  try {
+    await maintenanceTableReady;
+    const { user_id, asset, service, provider, date, cost, status, category, progress } = req.body;
+    if (!user_id || !asset?.trim() || !service?.trim() || !date) {
+      return res.status(400).json({ success: false, message: "User ID, asset, service and date are required" });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO maintenance_records (user_id, asset, service, provider, service_date, cost, status, category, progress)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       RETURNING id, asset, service, provider, service_date AS date, cost, status, category, progress`,
+      [user_id, asset.trim(), service.trim(), provider || "Self", date, Number(cost || 0), status || "scheduled", category || "Home Repair", Number(progress || 0)]
+    );
+    res.status(201).json({ success: true, record: result.rows[0] });
+  } catch (error) {
+    console.error("ADD maintenance error:", error);
+    res.status(500).json({ success: false, message: "Failed to save maintenance" });
+  }
+});
+
+app.put("/api/maintenance/:id", async (req, res) => {
+  try {
+    await maintenanceTableReady;
+    const { user_id, asset, service, provider, date, cost, status, category, progress } = req.body;
+    const result = await pool.query(
+      `UPDATE maintenance_records
+       SET asset=$1, service=$2, provider=$3, service_date=$4, cost=$5, status=$6, category=$7, progress=$8
+       WHERE id=$9 AND user_id=$10
+       RETURNING id, asset, service, provider, service_date AS date, cost, status, category, progress`,
+      [asset?.trim(), service?.trim(), provider || "Self", date, Number(cost || 0), status || "scheduled", category || "Home Repair", Number(progress || 0), req.params.id, user_id]
+    );
+    if (!result.rows.length) return res.status(404).json({ success: false, message: "Maintenance record not found" });
+    res.json({ success: true, record: result.rows[0] });
+  } catch (error) {
+    console.error("UPDATE maintenance error:", error);
+    res.status(500).json({ success: false, message: "Failed to update maintenance" });
+  }
+});
+
+app.delete("/api/maintenance/:id", async (req, res) => {
+  try {
+    await maintenanceTableReady;
+    const result = await pool.query(
+      "DELETE FROM maintenance_records WHERE id=$1 AND user_id=$2 RETURNING id",
+      [req.params.id, req.query.user_id]
+    );
+    if (!result.rows.length) return res.status(404).json({ success: false, message: "Maintenance record not found" });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("DELETE maintenance error:", error);
+    res.status(500).json({ success: false, message: "Failed to delete maintenance" });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 
 const server = app.listen(PORT, () => {
@@ -1397,4 +2308,105 @@ server.on("error", (error) => {
 
 server.on("close", () => {
   console.log("SERVER CLOSED");
+});
+
+// ==========================================
+// REMINDERS - CRUD
+// ==========================================
+
+app.get("/api/reminders", async (req, res) => {
+  try {
+    await remindersTableReady;
+    const { user_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
+    const result = await pool.query(
+      `SELECT id, title, description, reminder_date, type, priority, completed
+       FROM reminders WHERE user_id = $1 ORDER BY reminder_date ASC, created_at DESC`,
+      [user_id]
+    );
+
+    res.json({
+      success: true,
+      reminders: result.rows.map((reminder) => ({
+        ...reminder,
+        date: String(reminder.reminder_date).slice(0, 10),
+        dueIn: "Upcoming",
+      })),
+    });
+  } catch (error) {
+    console.error("GET reminders error:", error);
+    res.status(500).json({ success: false, message: "Failed to load reminders" });
+  }
+});
+
+app.post("/api/reminders", async (req, res) => {
+  try {
+    await remindersTableReady;
+    const { user_id, title, description, date, type, priority } = req.body;
+
+    if (!user_id || !title?.trim() || !date) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID, title and date are required",
+      });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO reminders (user_id, title, description, reminder_date, type, priority)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [user_id, title.trim(), description || null, date, type || "other", priority || "Medium"]
+    );
+
+    res.status(201).json({ success: true, reminder: result.rows[0] });
+  } catch (error) {
+    console.error("ADD reminder error:", error);
+    res.status(500).json({ success: false, message: "Failed to save reminder" });
+  }
+});
+
+app.put("/api/reminders/:id", async (req, res) => {
+  try {
+    await remindersTableReady;
+    const { user_id, title, description, date, type, priority, completed } = req.body;
+
+    const result = await pool.query(
+      `UPDATE reminders
+       SET title = $1, description = $2, reminder_date = $3, type = $4,
+           priority = $5, completed = $6
+       WHERE id = $7 AND user_id = $8 RETURNING *`,
+      [title?.trim(), description || null, date, type || "other", priority || "Medium", Boolean(completed), req.params.id, user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Reminder not found" });
+    }
+
+    res.json({ success: true, reminder: result.rows[0] });
+  } catch (error) {
+    console.error("UPDATE reminder error:", error);
+    res.status(500).json({ success: false, message: "Failed to update reminder" });
+  }
+});
+
+app.delete("/api/reminders/:id", async (req, res) => {
+  try {
+    await remindersTableReady;
+    const result = await pool.query(
+      "DELETE FROM reminders WHERE id = $1 AND user_id = $2 RETURNING id",
+      [req.params.id, req.query.user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Reminder not found" });
+    }
+
+    res.json({ success: true, message: "Reminder deleted" });
+  } catch (error) {
+    console.error("DELETE reminder error:", error);
+    res.status(500).json({ success: false, message: "Failed to delete reminder" });
+  }
 });
