@@ -27,6 +27,10 @@ import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 
 import ManagementPage from "./pages/ManagementPages";
+import SecondBrain from "./pages/SecondBrain";
+import LifeRadar from "./pages/LifeRadar";
+import LifeAuditor from "./pages/LifeAuditor";
+import SmartAlerts from "./pages/SmartAlerts";
 
 
 // =====================================================
@@ -57,7 +61,36 @@ function ProtectedRoutes() {
           path="/dashboard"
           element={<Dashboard />}
         />
+{/* ================= SECOND BRAIN ================= */}
 
+<Route
+  path="/second-brain"
+  element={<SecondBrain />}
+/>
+
+
+{/* ================= LIFE RADAR ================= */}
+
+<Route
+  path="/life-radar"
+  element={<LifeRadar />}
+/>
+
+
+{/* ================= LIFE AUDITOR ================= */}
+
+<Route
+  path="/life-auditor"
+  element={<LifeAuditor />}
+/>
+
+
+{/* ================= SMART ALERTS ================= */}
+
+<Route
+  path="/smart-alerts"
+  element={<SmartAlerts />}
+/>
 
         {/* ================= ASSETS ================= */}
 

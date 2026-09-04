@@ -11,6 +11,7 @@ import {
 import { getDisplayName } from "../../utils/helpers";
 
 function Header({ onMenuClick }) {
+  const [notifications, setNotifications] = useState([]);
   const [darkMode, setDarkMode] = useState(
     () => localStorage.getItem("myhome-theme") === "dark"
   );
@@ -22,6 +23,30 @@ function Header({ onMenuClick }) {
     const user = savedUser ? JSON.parse(savedUser) : null;
     return getDisplayName(user);
   });
+  useEffect(() => {
+  const loadNotifications = async () => {
+    try {
+      const savedUser = localStorage.getItem("myhomeUser");
+      const user = savedUser ? JSON.parse(savedUser) : null;
+
+      if (!user?.id) return;
+
+      const response = await fetch(
+        `http://localhost:5000/api/notifications?user_id=${user.id}`
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setNotifications(data);
+      }
+    } catch (error) {
+      console.error("Failed to load notifications:", error);
+    }
+  };
+
+  loadNotifications();
+}, []);
 
   useEffect(() => {
     const updateProfile = () => {
@@ -220,9 +245,11 @@ function Header({ onMenuClick }) {
             className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <Bell size={19} />
-            <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white">
-              3
-            </span>
+           {notifications.length > 0 && (
+  <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white">
+    {notifications.length > 9 ? "9+" : notifications.length}
+  </span>
+)}
           </button>
 
           <button

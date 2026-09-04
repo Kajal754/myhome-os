@@ -45,10 +45,12 @@ export default function Login() {
 
       localStorage.setItem("isLoggedIn", "true");
 
-      localStorage.setItem(
-        "myhomeUser",
-        JSON.stringify(data.user)
-      );
+     console.log("LOGGED IN USER:", data.user);
+
+localStorage.setItem(
+  "myhomeUser",
+  JSON.stringify(data.user)
+);
 
       if (remember) {
         localStorage.setItem("rememberMe", "true");

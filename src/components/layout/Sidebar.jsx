@@ -18,6 +18,10 @@ import {
   X,
   Check,
   Sparkles,
+  Brain,
+  Radar,
+  SearchCheck,
+  BellRing,
 } from "lucide-react";
 
 import { NavLink } from "react-router-dom";
@@ -63,7 +67,6 @@ const mainMenu = [
     name: "Reminders",
     path: "/reminders",
     icon: Bell,
-    badge: 3,
   },
   {
     name: "Family",
@@ -81,14 +84,64 @@ const mainMenu = [
     icon: BarChart3,
   },
 ];
+const intelligenceMenu = [
+  {
+    name: "Second Brain",
+    path: "/second-brain",
+    icon: Brain,
+  },
+  {
+    name: "Life Radar",
+    path: "/life-radar",
+    icon: Radar,
+  },
+  {
+    name: "Life Auditor",
+    path: "/life-auditor",
+    icon: SearchCheck,
+  },
+  {
+    name: "Smart Alerts",
+    path: "/smart-alerts",
+    icon: BellRing,
+  },
+];
 
 function Sidebar({ mobile = false }) {
   const [showPremium, setShowPremium] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [profileName, setProfileName] = useState(() => {
     const savedUser = localStorage.getItem("myhomeUser");
     const user = savedUser ? JSON.parse(savedUser) : null;
     return getDisplayName(user);
   });
+
+  useEffect(() => {
+    const loadUnreadNotifications = async () => {
+      const savedUser = localStorage.getItem("myhomeUser");
+      const user = savedUser ? JSON.parse(savedUser) : null;
+      if (!user?.id) return;
+
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/notifications?user_id=${user.id}`
+        );
+        const data = await response.json();
+        if (response.ok && Array.isArray(data)) {
+          setUnreadNotifications(data.length);
+        }
+      } catch (error) {
+        console.error("LOAD notification badge error:", error);
+      }
+    };
+
+    loadUnreadNotifications();
+    window.addEventListener("myhome-notifications-change", loadUnreadNotifications);
+
+    return () => {
+      window.removeEventListener("myhome-notifications-change", loadUnreadNotifications);
+    };
+  }, []);
 
   useEffect(() => {
     const updateProfileName = () => {
@@ -157,9 +210,9 @@ function Sidebar({ mobile = false }) {
                     {item.name}
                   </span>
 
-                  {item.badge && (
+                  {(item.badge || (item.name === "Reminders" && unreadNotifications > 0)) && (
                     <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold">
-                      {item.badge}
+                      {item.badge || unreadNotifications}
                     </span>
                   )}
 
@@ -170,13 +223,58 @@ function Sidebar({ mobile = false }) {
                 </NavLink>
               );
             })}
-          </nav>
+         </nav>
 
-          <div className="my-5 h-px bg-white/10" />
 
-          <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-200/40">
-            System
-          </p>
+{/* ================= INTELLIGENCE ================= */}
+
+<div className="my-5 h-px bg-white/10" />
+
+<p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-200/40">
+  Intelligence
+</p>
+
+<nav className="space-y-1">
+
+  {intelligenceMenu.map((item) => {
+    const Icon = item.icon;
+
+    return (
+      <NavLink
+        key={item.path}
+        to={item.path}
+        className={({ isActive }) =>
+          `group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all ${
+            isActive
+              ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-purple-950/30"
+              : "text-slate-300 hover:bg-white/[0.07] hover:text-white"
+          }`
+        }
+      >
+        <Icon size={18} strokeWidth={1.9} />
+
+        <span className="flex-1 text-[12px] font-medium">
+          {item.name}
+        </span>
+
+        <ChevronRight
+          size={13}
+          className="opacity-0 transition group-hover:opacity-40"
+        />
+      </NavLink>
+    );
+  })}
+
+</nav>
+
+
+{/* ================= SYSTEM ================= */}
+
+<div className="my-5 h-px bg-white/10" />
+
+<p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-200/40">
+  System
+</p>
 
           <NavLink
             to="/settings"

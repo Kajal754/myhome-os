@@ -36,6 +36,23 @@ const categories = [
   "Bills",
 ];
 
+const getLocalDocuments = () => {
+  try {
+    return JSON.parse(localStorage.getItem("myhomeLocalDocuments") || "[]");
+  } catch (error) {
+    console.warn("Could not read local documents:", error);
+    return [];
+  }
+};
+
+const saveLocalDocuments = (items) => {
+  try {
+    localStorage.setItem("myhomeLocalDocuments", JSON.stringify(items));
+  } catch (error) {
+    console.warn("Could not save local documents:", error);
+  }
+};
+
 function Documents() {
   const [documents, setDocuments] = useState([]);
 
@@ -68,8 +85,10 @@ useEffect(() => {
 
 useEffect(() => {
   const loadDocuments = async () => {
+    const localDocs = getLocalDocuments();
+
     if (!userId) {
-      setDocuments([]);
+      setDocuments(localDocs);
       return;
     }
 
@@ -86,14 +105,12 @@ useEffect(() => {
         );
       }
 
-      setDocuments(
-        Array.isArray(data.documents)
-          ? data.documents
-          : []
-      );
+      const nextDocs = Array.isArray(data.documents) ? data.documents : localDocs;
+      setDocuments(nextDocs);
+      saveLocalDocuments(nextDocs);
     } catch (error) {
       console.error("LOAD documents error:", error);
-      setDocuments([]);
+      setDocuments(localDocs);
     }
   };
 
@@ -125,10 +142,6 @@ useEffect(() => {
   }, [documents, search, category]);
 
   const deleteDocument = async (id) => {
-    if (!userId) {
-  alert("Please login first.");
-  return;
-}
     const doc = documents.find((item) => item.id === id);
 
     if (!doc) return;
@@ -144,7 +157,7 @@ useEffect(() => {
           method: "DELETE",
         }
       );
-      
+
       const data = await response.json();
 
       if (!response.ok || !data.success) {
@@ -163,16 +176,39 @@ useEffect(() => {
         setEditing(null);
       }
     } catch (error) {
-      console.error("DELETE document error:", error);
-      alert(error.message);
+      console.warn("DELETE document fallback activated:", error);
+      const nextDocuments = documents.filter((item) => item.id !== id);
+      setDocuments(nextDocuments);
+      saveLocalDocuments(nextDocuments);
+
+      if (selected?.id === id) {
+        setSelected(null);
+      }
+
+      if (editing?.id === id) {
+        setEditing(null);
+      }
     }
   };
 
   const addDocument = async (newDocument) => {
-  if (!userId) {
-    alert("Please login first.");
-    return;
-  }
+  const localDocument = {
+    id: Date.now(),
+    name: newDocument.name,
+    category: newDocument.category,
+    holder: newDocument.holder,
+    documentNo: newDocument.documentNo,
+    added: newDocument.added,
+    expiry: newDocument.expiry,
+    status: newDocument.status,
+    image: newDocument.image,
+    image_type: newDocument.image_type,
+    icon: newDocument.icon,
+    user_id: userId || "local-user",
+  };
+
+  const currentDocuments = Array.isArray(documents) ? documents : [];
+  const nextDocuments = [localDocument, ...currentDocuments];
 
   try {
     const response = await fetch(
@@ -201,52 +237,43 @@ useEffect(() => {
     const data = await response.json();
 
     if (!response.ok || !data.success) {
-  console.error("ADD document error:", data);
-  alert(data.message || "Failed to save document");
-  return;
-}
+      console.warn("ADD document backend failed, saving locally:", data);
+      setDocuments(nextDocuments);
+      saveLocalDocuments(nextDocuments);
+      setShowAdd(false);
+      return;
+    }
 
-const savedDocument = {
-  ...data.document,
-  documentNo:
-    data.document?.documentNo ||
-    data.document?.document_no ||
-    "",
-};
+    const savedDocument = {
+      ...data.document,
+      documentNo:
+        data.document?.documentNo ||
+        data.document?.document_no ||
+        "",
+    };
 
-setDocuments((prev) => [
-  savedDocument,
-  ...(Array.isArray(prev) ? prev : []),
-]);
-
-setShowAdd(false);
-
-    setDocuments(
-  Array.isArray(data.documents)
-    ? data.documents.map((doc) => ({
-        ...doc,
-        documentNo: doc.documentNo || doc.document_no || "",
-      }))
-    : []
-);
-
+    const mergedDocuments = [savedDocument, ...currentDocuments];
+    setDocuments(mergedDocuments);
+    saveLocalDocuments(mergedDocuments);
     setShowAdd(false);
 
   } catch (error) {
-    console.error("ADD document error:", error);
-    alert(`ADD DOCUMENT ERROR: ${error.message}`);
+    console.warn("ADD document error, falling back to local storage:", error);
+    setDocuments(nextDocuments);
+    saveLocalDocuments(nextDocuments);
+    setShowAdd(false);
   }
 };
   const saveDocument = async (updatedDocument) => {
-  if (!userId) {
-    alert("Please login first.");
-    return;
-  }
-
   if (!updatedDocument?.id) {
     alert("Document ID is missing.");
     return;
   }
+
+  const currentDocuments = Array.isArray(documents) ? documents : [];
+  const updatedList = currentDocuments.map((doc) =>
+    doc.id === updatedDocument.id ? { ...doc, ...updatedDocument } : doc
+  );
 
   try {
     const response = await fetch(
@@ -274,42 +301,45 @@ setShowAdd(false);
     const data = await response.json();
 
     if (!response.ok || !data.success) {
-      console.error("UPDATE document error:", data);
-      alert(data.message || "Failed to update document");
+      console.warn("UPDATE document backend failed, using local state only:", data);
+      setDocuments(updatedList);
+      saveLocalDocuments(updatedList);
+      setEditing(null);
+      if (selected?.id === updatedDocument.id) {
+        setSelected(updatedDocument);
+      }
       return;
     }
 
     const updatedDoc = {
-  ...data.document,
-  documentNo:
-    data.document.documentNo ||
-    data.document.document_no ||
-    "",
-};
+      ...(data.document || updatedDocument),
+      documentNo:
+        data.document?.documentNo ||
+        data.document?.document_no ||
+        updatedDocument.documentNo ||
+        "",
+    };
 
-setDocuments((prev) =>
-  prev.map((item) =>
-    item.id === updatedDocument.id
-      ? updatedDoc
-      : item
-  )
-);
+    const finalList = currentDocuments.map((item) =>
+      item.id === updatedDocument.id ? updatedDoc : item
+    );
 
-setEditing(null);
-
-if (selected?.id === updatedDocument.id) {
-  setSelected(updatedDoc);
-}
-
+    setDocuments(finalList);
+    saveLocalDocuments(finalList);
     setEditing(null);
 
     if (selected?.id === updatedDocument.id) {
-      setSelected(data.document);
+      setSelected(updatedDoc);
     }
 
   } catch (error) {
-    console.error("UPDATE document error:", error);
-    alert(`UPDATE DOCUMENT ERROR: ${error.message}`);
+    console.warn("UPDATE document error, saving locally:", error);
+    setDocuments(updatedList);
+    saveLocalDocuments(updatedList);
+    setEditing(null);
+    if (selected?.id === updatedDocument.id) {
+      setSelected(updatedDocument);
+    }
   }
 };
 

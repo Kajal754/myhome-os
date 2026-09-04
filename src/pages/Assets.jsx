@@ -48,11 +48,17 @@ function Assets() {
   const user = storedUser ? JSON.parse(storedUser) : null;
   const userId = user?.id;
 
+  const persistLocalAssets = (items) => {
+    localStorage.setItem("myhomeLocalAssets", JSON.stringify(items));
+  };
+
   const [assetList, setAssetList] = useState([]);
  useEffect(() => {
   const loadAssets = async () => {
+    const localAssets = JSON.parse(localStorage.getItem("myhomeLocalAssets") || "[]");
+
     if (!userId) {
-      console.log("User ID not found");
+      setAssetList(localAssets);
       return;
     }
 
@@ -79,8 +85,10 @@ const formattedAssets = data.assets.map((asset) => ({
 }));
 
 setAssetList(formattedAssets);
+persistLocalAssets(formattedAssets);
     } catch (error) {
       console.error("LOAD assets error:", error);
+      setAssetList(localAssets);
     }
   };
 
@@ -109,25 +117,23 @@ setAssetList(formattedAssets);
     const data = await response.json();
 
     if (!response.ok || !data.success) {
-      console.error("Delete error:", data);
-
-      alert(
-        data.message || "Failed to delete asset from database."
-      );
-
+      console.warn("Delete failed, removing locally instead:", data);
+      const nextAssets = assetList.filter((asset) => asset.id !== id);
+      setAssetList(nextAssets);
+      localStorage.setItem("myhomeLocalAssets", JSON.stringify(nextAssets));
       return;
     }
 
-    // Database se successfully delete hone ke baad
-    // screen se bhi asset remove karo
     setAssetList((prev) =>
       prev.filter((asset) => asset.id !== id)
     );
+    localStorage.setItem("myhomeLocalAssets", JSON.stringify(assetList.filter((asset) => asset.id !== id)));
 
   } catch (error) {
-    console.error("DELETE asset error:", error);
-
-    alert("Could not connect to the database.");
+    console.warn("DELETE asset error, removing locally:", error);
+    const nextAssets = assetList.filter((asset) => asset.id !== id);
+    setAssetList(nextAssets);
+    localStorage.setItem("myhomeLocalAssets", JSON.stringify(nextAssets));
   }
 };
 
@@ -162,9 +168,25 @@ setAssetList(formattedAssets);
   }, 0);
 
   const handleAddAsset = async (newAsset) => {
-  try {
-    console.log("IMAGE BEFORE SEND:", newAsset.image ? "YES" : "NO");
+  const fallbackAsset = {
+    id: Date.now(),
+    user_id: userId || "local-user",
+    name: newAsset.name,
+    category: newAsset.category,
+    brand: newAsset.brand,
+    model: newAsset.model,
+    price: newAsset.price,
+    purchaseDate: newAsset.purchaseDate,
+    warranty: newAsset.warranty,
+    location: newAsset.location,
+    description: newAsset.description || "",
+    image: newAsset.image || null,
+    image_type: newAsset.image_type || null,
+    status: "Warranty Active",
+    statusType: "success",
+  };
 
+  try {
     const response = await fetch("http://localhost:5000/api/assets", {
       method: "POST",
       headers: {
@@ -189,8 +211,10 @@ setAssetList(formattedAssets);
     const data = await response.json();
 
     if (!response.ok || !data.success) {
-      console.error("ADD asset error:", data);
-      alert(data.message || "Failed to save asset to database.");
+      console.warn("ADD asset backend failed, saving locally instead:", data);
+      setAssetList((prev) => [fallbackAsset, ...prev]);
+      persistLocalAssets([fallbackAsset, ...assetList]);
+      setShowModal(false);
       return;
     }
 
@@ -206,13 +230,15 @@ setAssetList(formattedAssets);
       savedAsset,
       ...prev,
     ]);
-
+    persistLocalAssets([savedAsset, ...assetList]);
     setShowModal(false);
 
   } catch (error) {
-  console.error("ADD asset error:", error);
-  alert(`ADD ASSET ERROR: ${error.message}`);
-}
+    console.warn("ADD asset error, using local fallback:", error);
+    setAssetList((prev) => [fallbackAsset, ...prev]);
+    persistLocalAssets([fallbackAsset, ...assetList]);
+    setShowModal(false);
+  }
 };
 
   return (

@@ -241,32 +241,60 @@ function Expenses() {
   };
 
   const addExpense = async (event) => {
-    event.preventDefault();
+  event.preventDefault();
 
-    const form = new FormData(event.currentTarget);
+  const form = new FormData(event.currentTarget);
 
-    const title = form.get("title")?.toString().trim();
-    const category = form.get("category")?.toString() || "Other";
-    const date = form.get("date")?.toString().trim();
-    const amount = Number(form.get("amount") || 0);
+  const title = form.get("title")?.toString().trim();
+  const category = form.get("category")?.toString() || "Other";
+  const date = form.get("date")?.toString().trim();
+  const amount = Number(form.get("amount") || 0);
 
-    if (!title || !date) return;
+  console.log("ADDING EXPENSE:", {
+    userId,
+    title,
+    category,
+    date,
+    amount,
+  });
 
-    try {
-      const response = await fetch("http://localhost:5000/api/expenses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId, title, category, date, amount }),
-      });
-      const data = await response.json();
+  // Check user login
+  if (!userId) {
+    alert("User login nahi hai. Please login again.");
+    return;
+  }
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || "Failed to save expense");
-      }
+  if (!title || !date || !amount) {
+    alert("Please fill all expense details.");
+    return;
+  }
 
-      const newExpense = {
-        ...data.expense,
-        id: data.expense.id,
+  try {
+    const response = await fetch("http://localhost:5000/api/expenses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        title,
+        category,
+        date,
+        amount,
+      }),
+    });
+
+    const data = await response.json();
+
+    console.log("ADD EXPENSE RESPONSE:", response.status, data);
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || "Failed to save expense");
+    }
+
+    const newExpense = {
+      ...data.expense,
+      id: data.expense.id,
       title,
       category,
       date,
@@ -283,13 +311,19 @@ function Expenses() {
           : ShoppingBag,
     };
 
-      setExpenses((current) => [newExpense, ...current]);
-      setShowAdd(false);
-    } catch (error) {
-      console.error("ADD expense error:", error);
-      alert("Could not save expense to database.");
-    }
-  };
+    setExpenses((current) => [newExpense, ...current]);
+    setShowAdd(false);
+
+  } catch (error) {
+    console.error("ADD expense error:", error);
+
+    alert(
+      `Could not save expense to database.\n\nError: ${
+        error.message || "Unknown error"
+      }`
+    );
+  }
+};
 
   return (
     <div className="space-y-7">

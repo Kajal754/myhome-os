@@ -18,48 +18,6 @@ import {
   Check,
 } from "lucide-react";
 
-const initialReminders = [
-  {
-    id: 1,
-    title: "AC Service",
-    description: "Schedule your LG AC maintenance.",
-    date: "12 Aug 2026",
-    dueIn: "Tomorrow",
-    type: "maintenance",
-    priority: "High",
-    completed: false,
-  },
-  {
-    id: 2,
-    title: "TV Warranty",
-    description: "Samsung TV warranty will expire soon.",
-    date: "23 Aug 2026",
-    dueIn: "12 days",
-    type: "warranty",
-    priority: "Medium",
-    completed: false,
-  },
-  {
-    id: 3,
-    title: "Bike Insurance",
-    description: "Renew your Honda Shine insurance.",
-    date: "04 Sep 2026",
-    dueIn: "24 days",
-    type: "document",
-    priority: "Medium",
-    completed: false,
-  },
-  {
-    id: 4,
-    title: "Car Service",
-    description: "Regular service is coming up.",
-    date: "25 Sep 2026",
-    dueIn: "45 days",
-    type: "maintenance",
-    priority: "Low",
-    completed: false,
-  },
-];
 
 const typeConfig = {
   maintenance: {
@@ -111,6 +69,23 @@ function Reminders() {
   const userId = user?.id;
 
   const [reminders, setReminders] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+
+  const markNotificationsSeen = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/api/notifications/read", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId }),
+      });
+
+      if (!response.ok) throw new Error("Failed to mark notifications as read");
+      setNotifications([]);
+      window.dispatchEvent(new Event("myhome-notifications-change"));
+    } catch (error) {
+      console.error("MARK notifications read error:", error);
+    }
+  };
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
@@ -150,6 +125,34 @@ function Reminders() {
 
     loadReminders();
   }, [userId]);
+
+  // 👇 ISKE JUST BAAD PASTE KARO
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const loadNotifications = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/notifications?user_id=${userId}`
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load notifications");
+        }
+
+        setNotifications(data || []);
+      } catch (error) {
+        console.error("LOAD notifications error:", error);
+      }
+    };
+
+    loadNotifications();
+  }, [userId]);
+
+  // 👆 YAHAN TAK
 
   const activeReminders = reminders.filter(
     (item) => !item.completed
@@ -566,6 +569,77 @@ function Reminders() {
 
         </div>
       </section>
+      {/* =====================================================
+    SMART ALERTS
+===================================================== */}
+
+{notifications.length > 0 && (
+  <section className="mb-7">
+    <div className="mb-5">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-500">
+        Smart alerts
+      </p>
+
+      <h2 className="mt-1 text-2xl font-black text-slate-900 dark:text-white">
+        Important notifications
+      </h2>
+
+      <p className="mt-1 text-xs text-slate-400">
+        Automatic alerts related to your saved data.
+      </p>
+      <button
+        type="button"
+        onClick={markNotificationsSeen}
+        className="mt-3 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+      >
+        Mark all as seen
+      </button>
+    </div>
+
+    <div className="grid gap-5 md:grid-cols-2">
+      {notifications.map((notification) => (
+        <article
+          key={notification.id}
+          className="overflow-hidden rounded-[26px] border border-blue-100 bg-white shadow-sm dark:border-blue-950 dark:bg-slate-900"
+        >
+          <div className="h-1.5 bg-blue-500" />
+
+          <div className="p-5">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-300">
+                <Bell size={21} />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-500">
+                  {notification.type || "Notification"}
+                </p>
+
+                <h3 className="mt-1 text-base font-black text-slate-900 dark:text-white">
+                  {notification.title}
+                </h3>
+
+                <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  {notification.message}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-950">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Automatic alert
+              </span>
+
+              <span className="text-[10px] font-bold text-blue-500">
+                {notification.is_read ? "READ" : "NEW"}
+              </span>
+            </div>
+          </div>
+        </article>
+      ))}
+    </div>
+  </section>
+)}
 
       {/* =====================================================
           REMINDER LIST

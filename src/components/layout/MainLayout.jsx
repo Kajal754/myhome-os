@@ -36,7 +36,7 @@ function MainLayout({ children }) {
     >
       {/* Desktop Sidebar */}
       <div className="fixed inset-y-0 left-0 z-40 hidden lg:block">
-        <Sidebar />
+        <Sidebar mobile />
       </div>
 
       {/* Mobile Sidebar */}
