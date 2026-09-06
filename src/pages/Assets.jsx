@@ -66,7 +66,7 @@ function Assets() {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/assets?user_id=${userId}`
+        `${API_URL}/api/assets?user_id=${userId}`
       );
 
       if (!response.ok) {
@@ -110,7 +110,7 @@ persistLocalAssets(formattedAssets);
 
   try {
     const response = await fetch(
-  `http://localhost:5000/api/assets/${id}?user_id=${userId}`,
+  `${API_URL}/api/assets/${id}?user_id=${userId}`,
   {
     method: "DELETE",
   }

@@ -123,7 +123,7 @@ function Expenses() {
     const loadExpenses = async () => {
       try {
         const response = await fetch(
-          `http://localhost:5000/api/expenses?user_id=${userId}`
+          `${API_URL}/api/expenses?user_id=${userId}`
         );
         const data = await response.json();
 
@@ -193,7 +193,7 @@ function Expenses() {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/expenses/${deleteTarget.id}?user_id=${userId}`,
+        `${API_URL}/api/expenses/${deleteTarget.id}?user_id=${userId}`,
         { method: "DELETE" }
       );
       const data = await response.json();
@@ -217,7 +217,7 @@ function Expenses() {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/expenses/${editingExpense.id}`,
+        `${API_URL}/api/expenses/${editingExpense.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

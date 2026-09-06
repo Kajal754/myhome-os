@@ -31,7 +31,7 @@ function Family() {
   const loadMembers = async () => {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/family-members?user_id=${userId}`
+        `${API_URL}/api/family-members?user_id=${userId}`
       );
 
       const data = await response.json();
@@ -86,7 +86,7 @@ const deleteMember = async () => {
 
   try {
     const response = await fetch(
-      `http://localhost:5000/api/family-members/${showDelete.id}?user_id=${userId}`,
+      `${API_URL}/api/family-members/${showDelete.id}?user_id=${userId}`,
       {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -116,7 +116,7 @@ const deleteMember = async () => {
   const saveEdit = async (updatedMember) => {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/family-members/${updatedMember.id}`,
+        `${API_URL}/api/family-members/${updatedMember.id}`,
         {
           method: "PUT",
           headers: {
