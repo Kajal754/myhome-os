@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import API_URL from "../config/api";
 import {
   Activity,
   FileText,
@@ -12,7 +13,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-const API = "http://localhost:5000";
+
 
 function getScoreLabel(score) {
   if (score >= 85) return "Excellent";
@@ -74,8 +75,8 @@ export default function LifeRadar() {
       }
 
       const response = await fetch(
-        `${API}/api/life-radar?user_id=${userId}`
-      );
+  `${API_URL}/api/life-radar?user_id=${userId}`
+);
 
       const result = await response.json();
 

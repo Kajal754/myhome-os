@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import API_URL from "../config/api";
 import {
   Plus,
   Bell,
@@ -73,7 +74,7 @@ function Reminders() {
 
   const markNotificationsSeen = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/notifications/read", {
+      const response = await fetch(`${API_URL}/api/notifications/read`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: userId }),
@@ -109,7 +110,7 @@ function Reminders() {
     const loadReminders = async () => {
       try {
         const response = await fetch(
-          `http://localhost:5000/api/reminders?user_id=${userId}`
+          `${API_URL}/api/reminders?user_id=${userId}`
         );
         const data = await response.json();
 
@@ -134,7 +135,7 @@ function Reminders() {
     const loadNotifications = async () => {
       try {
         const response = await fetch(
-          `http://localhost:5000/api/notifications?user_id=${userId}`
+          `${API_URL}/api/notifications?user_id=${userId}`
         );
 
         const data = await response.json();
@@ -191,7 +192,7 @@ function Reminders() {
     if (!reminder) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/reminders/${id}`, {
+      const response = await fetch(`${API_URL}/api/reminders/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...reminder, user_id: userId, completed: true }),
@@ -212,7 +213,7 @@ function Reminders() {
     }
 
     try {
-      const response = await fetch("http://localhost:5000/api/reminders", {
+      const response = await fetch(`${API_URL}/api/reminders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...newReminder, user_id: userId }),
@@ -242,7 +243,7 @@ function Reminders() {
     event.preventDefault();
 
     try {
-      const response = await fetch(`http://localhost:5000/api/reminders/${editReminder.id}`, {
+      const response = await fetch(`${API_URL}/api/reminders/${editReminder.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...editReminder, user_id: userId, date: editReminder.date }),
@@ -264,7 +265,7 @@ function Reminders() {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/reminders/${deleteReminder.id}?user_id=${userId}`,
+        `${API_URL}/api/reminders/${deleteReminder.id}?user_id=${userId}`,
         { method: "DELETE" }
       );
       const data = await response.json();

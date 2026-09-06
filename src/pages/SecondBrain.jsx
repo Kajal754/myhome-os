@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import API_URL from "../config/api";
 import AskMyLife from "../components/brain/AskMyLife";
 import {
   AlertTriangle,
@@ -187,13 +188,13 @@ export default function SecondBrain() {
     try {
       const [knowledgeRes, documentsRes, assetsRes] = await Promise.all([
         fetch(
-          `http://localhost:5000/api/brain/knowledge?user_id=${userId}`
+          `${API_URL}/api/brain/knowledge?user_id=${userId}`
         ),
         fetch(
-          `http://localhost:5000/api/documents?user_id=${userId}`
+         `${API_URL}/api/documents?user_id=${userId}`
         ),
         fetch(
-          `http://localhost:5000/api/assets?user_id=${userId}`
+          `${API_URL}/api/assets?user_id=${userId}`
         ),
       ]);
 
@@ -314,11 +315,11 @@ export default function SecondBrain() {
     let endpoint;
 
     if (itemType === "asset") {
-      endpoint = `http://localhost:5000/api/assets/${itemId}?user_id=${userId}`;
+      endpoint = `${API_URL}/api/assets/${itemId}?user_id=${userId}`;
     } else if (itemType === "document") {
-      endpoint = `http://localhost:5000/api/documents/${itemId}?user_id=${userId}`;
+      endpoint = `${API_URL}/api/documents/${itemId}?user_id=${userId}`;
     } else {
-      endpoint = `http://localhost:5000/api/brain/knowledge/${itemId}?user_id=${userId}`;
+     endpoint = `${API_URL}/api/brain/knowledge/${itemId}?user_id=${userId}`;
     }
 
     try {
@@ -349,7 +350,7 @@ export default function SecondBrain() {
 
   try {
     const response = await fetch(
-      "http://localhost:5000/api/brain/knowledge",
+      `${API_URL}/api/brain/knowledge`,
       {
         method: "POST",
         headers: {
@@ -436,7 +437,7 @@ export default function SecondBrain() {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/brain/knowledge",
+        `${API_URL}/api/brain/knowledge`,
         {
           method: "POST",
           headers: {
@@ -490,7 +491,7 @@ export default function SecondBrain() {
 
   try {
     const response = await fetch(
-      "http://localhost:5000/api/brain/ask",
+      `${API_URL}/api/brain/ask`,
       {
         method: "POST",
         headers: {

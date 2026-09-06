@@ -1,4 +1,6 @@
+
 import { useEffect, useMemo, useState } from "react";
+import API_URL from "../config/api";
 import { Link } from "react-router-dom";
 import {
   Search,
@@ -187,7 +189,7 @@ persistLocalAssets(formattedAssets);
   };
 
   try {
-    const response = await fetch("http://localhost:5000/api/assets", {
+    const response = await fetch(`${API_URL}/api/assets`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

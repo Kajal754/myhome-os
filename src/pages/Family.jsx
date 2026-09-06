@@ -1,4 +1,6 @@
+
 import { useEffect, useMemo, useState } from "react";
+import API_URL from "../config/api";
 import {
   Users,
   UserPlus,
@@ -159,7 +161,7 @@ const deleteMember = async () => {
         `https://i.pravatar.cc/150?u=${newMember.email}`,
     };
 
-    const response = await fetch("http://localhost:5000/api/family-members", {
+    const response = await fetch(`${API_URL}/api/family-members`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

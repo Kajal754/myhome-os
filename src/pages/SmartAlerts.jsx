@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import API_URL from "../config/api";
 import {
   Bell,
   CalendarClock,
@@ -51,8 +52,8 @@ export default function SmartAlerts() {
     const loadAlerts = async () => {
       try {
         const [assetsResponse, documentsResponse] = await Promise.all([
-          fetch(`http://localhost:5000/api/assets?user_id=${user.id}`),
-          fetch(`http://localhost:5000/api/documents?user_id=${user.id}`),
+          fetch(`${API_URL}/api/assets?user_id=${user.id}`),
+fetch(`${API_URL}/api/documents?user_id=${user.id}`),
         ]);
 
         const assetsPayload = assetsResponse.ok

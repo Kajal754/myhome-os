@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import API_URL from "../config/api";
 import { useNavigate } from "react-router-dom";
 import {
   Settings as SettingsIcon,
@@ -55,7 +56,7 @@ useEffect(() => {
       if (!userId) return;
 
       const response = await fetch(
-        `http://localhost:5000/api/settings?user_id=${userId}`
+        `${API_URL}/api/settings?user_id=${userId}`
       );
       const data = await response.json();
 
@@ -168,7 +169,7 @@ useEffect(() => {
   }
 
   try {
-    const response = await fetch("http://localhost:5000/api/settings", {
+    const response = await fetch(`${API_URL}/api/settings`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -232,7 +233,7 @@ useEffect(() => {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/settings",
+        `${API_URL}/api/settings`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

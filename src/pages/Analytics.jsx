@@ -10,6 +10,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import API_URL from "../config/api";
 
 const categoryMeta = [
   { name: "Maintenance", amount: 1800, percent: 39, icon: Wrench },
@@ -34,10 +35,10 @@ function Analytics() {
     if (!userId) return;
 
     Promise.all([
-      fetch(`http://localhost:5000/api/expenses?user_id=${userId}`),
-      fetch(`http://localhost:5000/api/assets?user_id=${userId}`),
-      fetch(`http://localhost:5000/api/maintenance?user_id=${userId}`),
-      fetch(`http://localhost:5000/api/reminders?user_id=${userId}`),
+      fetch(`${API_URL}/api/expenses?user_id=${userId}`),
+fetch(`${API_URL}/api/assets?user_id=${userId}`),
+fetch(`${API_URL}/api/maintenance?user_id=${userId}`),
+fetch(`${API_URL}/api/reminders?user_id=${userId}`),
     ])
       .then((responses) => Promise.all(responses.map((response) => response.json())))
       .then(([expenseData, assetData, maintenanceData, reminderData]) => {

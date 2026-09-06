@@ -16,6 +16,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import API_URL from "../config/api";
 
 const initialWarranties = [
   {
@@ -81,7 +82,7 @@ function Warranties() {
     const loadWarranties = async () => {
       try {
         const response = await fetch(
-          `http://localhost:5000/api/assets?user_id=${userId}`
+          `${API_URL}/api/assets?user_id=${userId}`
         );
         const data = await response.json();
 
@@ -194,7 +195,7 @@ function Warranties() {
     const asset = deleteTarget.sourceAsset;
     try {
       const response = await fetch(
-        `http://localhost:5000/api/assets/${deleteTarget.assetId}`,
+        `${API_URL}/api/assets/${deleteTarget.assetId}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -225,7 +226,7 @@ function Warranties() {
     const asset = editingWarranty.sourceAsset;
     try {
       const response = await fetch(
-        `http://localhost:5000/api/assets/${editingWarranty.assetId}`,
+        `${API_URL}/api/assets/${editingWarranty.assetId}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import API_URL from "../config/api";
 import {
   SearchCheck,
   AlertTriangle,
@@ -92,8 +93,8 @@ export default function LifeAuditor() {
       console.log("LIFE AUDITOR USER ID:", userId);
 
       const response = await fetch(
-        `http://localhost:5000/api/life-auditor?user_id=${userId}`
-      );
+  `${API_URL}/api/life-auditor?user_id=${userId}`
+);
 
       const result = await response.json();
 
