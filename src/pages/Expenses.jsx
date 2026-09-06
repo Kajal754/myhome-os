@@ -771,7 +771,7 @@ function Expenses() {
                     </span>
 
                     <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                      {expense.date}
+                      {formatDate(expense.date)}
                     </span>
 
                     <span className="text-sm font-black text-slate-900 dark:text-white">
@@ -943,15 +943,18 @@ function Expenses() {
                   </span>
 
                   <input
-                    value={editingExpense.date}
-                    onChange={(event) =>
-                      setEditingExpense((current) => ({
-                        ...current,
-                        date: event.target.value,
-                      }))
-                    }
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-700 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                  />
+  type="date"
+  value={editingExpense.date
+    ? String(editingExpense.date).slice(0, 10)
+    : ""}
+  onChange={(event) =>
+    setEditingExpense((current) => ({
+      ...current,
+      date: event.target.value,
+    }))
+  }
+  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-700 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+/>
                 </label>
 
                 <label className="block">
@@ -1061,12 +1064,12 @@ function Expenses() {
                     Date
                   </span>
 
-                  <input
-                    name="date"
-                    required
-                    placeholder="11 Aug 2026"
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                  />
+                 <input
+  name="date"
+  type="date"
+  required
+  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+/>
                 </label>
 
                 <label className="block">

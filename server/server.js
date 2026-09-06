@@ -19,6 +19,9 @@ const pool = new Pool({
   database: process.env.DB_NAME,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 console.log("Connected database:", process.env.DB_NAME);
@@ -3243,23 +3246,62 @@ ${
         (expense) => isThisMonth(expense.date)
       );
 
-      if (!monthlyExpenses.length) {
+      if (!expenses.length) {
         return res.json({
           success: true,
           found: false,
           answer:
-            "Is month aapke Expenses section mein koi expense saved nahi hai.",
+            "Aapke Expenses section mein abhi koi expense saved nahi hai.",
           results: [],
         });
       }
 
-      const total = monthlyExpenses.reduce(
+      const asksThisMonth = includesAny([
+        "this month",
+        "is month",
+        "iss month",
+        "current month",
+        "monthly",
+        "mahine",
+      ]);
+
+      const expenseQuestionWords = knowledgeSearchWords(originalQuestion).filter(
+        (word) =>
+          ![
+            "spend",
+            "spent",
+            "kharch",
+            "expense",
+            "expenses",
+            "kharcha",
+            "kitna",
+          ].includes(word)
+      );
+
+      const matchingExpenses = expenses.filter((expense) => {
+        if (!expenseQuestionWords.length) return false;
+
+        const text = normalize(
+          `${expense.title || ""} ${expense.category || ""}`
+        );
+
+        return expenseQuestionWords.every((word) => text.includes(word));
+      });
+
+      const hasSpecificExpense = matchingExpenses.length > 0;
+      const answerExpenses = hasSpecificExpense
+        ? matchingExpenses
+        : asksThisMonth && monthlyExpenses.length
+        ? monthlyExpenses
+        : expenses;
+
+      const total = answerExpenses.reduce(
         (sum, expense) =>
           sum + Number(expense.amount || 0),
         0
       );
 
-      const details = monthlyExpenses
+      const details = answerExpenses
         .map(
           (expense) =>
             `• ${expense.title || "Expense"} — ${formatMoney(
@@ -3268,21 +3310,38 @@ ${
               expense.category
                 ? ` (${expense.category})`
                 : ""
-            }`
+            }${expense.date ? ` — ${formatDate(expense.date)}` : ""}`
         )
         .join("\n");
+
+      const noCurrentMonthExpenses =
+        asksThisMonth && !monthlyExpenses.length && !hasSpecificExpense;
 
       return res.json({
         success: true,
         found: true,
         answer:
-          `Is month aapne total ${formatMoney(
-            total
-          )} spend kiya hai.\n\n${details}`,
-        results: monthlyExpenses,
+          hasSpecificExpense
+            ? `${answerExpenses
+                .map(
+                  (expense) =>
+                    `${expense.title || "Expense"} par aapka total spend ${formatMoney(
+                      expense.amount
+                    )} hai.`
+                )
+                .join("\n")}\n\n${details}`
+            : noCurrentMonthExpenses
+            ? `Is month aapka total ₹0 hai. Is user ke saved expenses ka total ${formatMoney(
+                total
+              )} hai.\n\n${details}`
+            : `Is month aapne total ${formatMoney(
+                total
+              )} spend kiya hai.\n\n${details}`,
+        results: answerExpenses,
       });
     }
 
+    
     // ==========================================
     // 4. MAINTENANCE / SERVICE
     // ==========================================
@@ -5861,16 +5920,11 @@ for (const warranty of expiringWarranties) {
 
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
-  sendUpcomingReminderEmails();
-  setInterval(sendUpcomingReminderEmails, 24 * 60 * 60 * 1000);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Backend running on http://localhost:${PORT}`);
+    sendUpcomingReminderEmails();
+  });
+}
 
-server.on("error", (error) => {
-  console.error("SERVER ERROR:", error);
-});
-
-server.on("close", () => {
-  console.log("SERVER CLOSED");
-});
+module.exports = app;
