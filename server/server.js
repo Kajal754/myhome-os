@@ -2817,7 +2817,7 @@ app.post("/api/brain/ask", async (req, res) => {
   remindersResult,
   providersResult,
   settingsResult,
-] = await Promise.all([
+] = await Promise.allSettled([
       pool.query(
   `
   SELECT
@@ -2975,15 +2975,24 @@ app.post("/api/brain/ask", async (req, res) => {
       ),
     ]);
 
-    const documents = documentsResult.rows;
-    const assets = assetsResult.rows;
-    const expenses = expensesResult.rows;
-    const maintenance = maintenanceResult.rows;
-    const knowledge = knowledgeResult.rows;
-    const familyMembers = familyResult.rows;
-    const reminders = remindersResult.rows;
-    const serviceProviders = providersResult.rows;
-    const settings = settingsResult.rows;
+    const rowsFrom = (result, section) => {
+      if (result.status === "rejected") {
+        console.error(`SECOND BRAIN ${section} QUERY ERROR:`, result.reason);
+        return [];
+      }
+
+      return result.value.rows;
+    };
+
+    const documents = rowsFrom(documentsResult, "DOCUMENTS");
+    const assets = rowsFrom(assetsResult, "ASSETS");
+    const expenses = rowsFrom(expensesResult, "EXPENSES");
+    const maintenance = rowsFrom(maintenanceResult, "MAINTENANCE");
+    const knowledge = rowsFrom(knowledgeResult, "KNOWLEDGE");
+    const familyMembers = rowsFrom(familyResult, "FAMILY");
+    const reminders = rowsFrom(remindersResult, "REMINDERS");
+    const serviceProviders = rowsFrom(providersResult, "PROVIDERS");
+    const settings = rowsFrom(settingsResult, "SETTINGS");
 
     console.log("====================================");
     console.log("SECOND BRAIN USER:", user_id);
