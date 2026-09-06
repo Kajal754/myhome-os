@@ -508,6 +508,12 @@ export default function SecondBrain() {
 
     console.log("BRAIN RESPONSE:", data);
 
+    if (!response.ok || data.success === false) {
+      throw new Error(
+        data.message || data.error || "Second Brain request failed."
+      );
+    }
+
     const assistantReply =
       data.answer ||
       "Mujhe aapke saved data mein is question se related information nahi mili.";
@@ -536,7 +542,7 @@ export default function SecondBrain() {
       },
       {
         role: "assistant",
-        text: "Second Brain se connect nahi ho pa raha. Please make sure backend server is running.",
+        text: `Second Brain error: ${error.message || "Request failed."}`,
       },
     ]);
   }
