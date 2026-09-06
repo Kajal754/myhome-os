@@ -69,7 +69,7 @@ export default function Register() {
       setSendingOtp(true);
 
       const response = await fetch(
-        "http://localhost:5000/api/auth/send-otp",
+        "/api/auth/send-otp",
         {
           method: "POST",
           headers: {
@@ -149,7 +149,7 @@ export default function Register() {
       setMessage("");
 
       const response = await fetch(
-        "http://localhost:5000/api/auth/verify-otp",
+        "/api/auth/verify-otp",
         {
           method: "POST",
           headers: {
@@ -194,7 +194,7 @@ export default function Register() {
       setMessage("");
 
       const response = await fetch(
-        "http://localhost:5000/api/auth/send-otp",
+        "/api/auth/send-otp",
         {
           method: "POST",
           headers: {

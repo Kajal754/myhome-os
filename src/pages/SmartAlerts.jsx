@@ -51,8 +51,8 @@ export default function SmartAlerts() {
     const loadAlerts = async () => {
       try {
         const [assetsResponse, documentsResponse] = await Promise.all([
-          fetch(`http://localhost:5000/api/assets?user_id=${user.id}`),
-          fetch(`http://localhost:5000/api/documents?user_id=${user.id}`),
+          fetch(`/api/assets?user_id=${user.id}`),
+          fetch(`/api/documents?user_id=${user.id}`),
         ]);
 
         const assetsPayload = assetsResponse.ok

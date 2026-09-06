@@ -12,7 +12,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-const API = "http://localhost:5000";
+const API = "";
 
 function getScoreLabel(score) {
   if (score >= 85) return "Excellent";

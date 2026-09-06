@@ -81,7 +81,7 @@ function Warranties() {
     const loadWarranties = async () => {
       try {
         const response = await fetch(
-          `http://localhost:5000/api/assets?user_id=${userId}`
+          `/api/assets?user_id=${userId}`
         );
         const data = await response.json();
 
@@ -194,7 +194,7 @@ function Warranties() {
     const asset = deleteTarget.sourceAsset;
     try {
       const response = await fetch(
-        `http://localhost:5000/api/assets/${deleteTarget.assetId}`,
+        `/api/assets/${deleteTarget.assetId}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -225,7 +225,7 @@ function Warranties() {
     const asset = editingWarranty.sourceAsset;
     try {
       const response = await fetch(
-        `http://localhost:5000/api/assets/${editingWarranty.assetId}`,
+        `/api/assets/${editingWarranty.assetId}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

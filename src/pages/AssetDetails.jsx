@@ -55,7 +55,7 @@ function AssetDetails() {
         setLoading(true);
 
         const response = await fetch(
-          `http://localhost:5000/api/assets/${id}?user_id=${userId}`
+          `/api/assets/${id}?user_id=${userId}`
         );
 
         const data = await response.json();
@@ -148,7 +148,7 @@ const handleSave = async () => {
     setSaving(true);
 
     const response = await fetch(
-      `http://localhost:5000/api/assets/${id}`,
+      `/api/assets/${id}`,
       {
         method: "PUT",
         headers: {
@@ -222,7 +222,7 @@ const handleSave = async () => {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/assets/${id}?user_id=${userId}`,
+        `/api/assets/${id}?user_id=${userId}`,
         { method: "DELETE" }
       );
       const data = await response.json();
