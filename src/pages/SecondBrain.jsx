@@ -187,13 +187,13 @@ export default function SecondBrain() {
     try {
       const [knowledgeRes, documentsRes, assetsRes] = await Promise.all([
         fetch(
-          `/api/brain/knowledge?user_id=${userId}`
+          `http://localhost:5000/api/brain/knowledge?user_id=${userId}`
         ),
         fetch(
-          `/api/documents?user_id=${userId}`
+          `http://localhost:5000/api/documents?user_id=${userId}`
         ),
         fetch(
-          `/api/assets?user_id=${userId}`
+          `http://localhost:5000/api/assets?user_id=${userId}`
         ),
       ]);
 
@@ -314,11 +314,11 @@ export default function SecondBrain() {
     let endpoint;
 
     if (itemType === "asset") {
-      endpoint = `/api/assets/${itemId}?user_id=${userId}`;
+      endpoint = `http://localhost:5000/api/assets/${itemId}?user_id=${userId}`;
     } else if (itemType === "document") {
-      endpoint = `/api/documents/${itemId}?user_id=${userId}`;
+      endpoint = `http://localhost:5000/api/documents/${itemId}?user_id=${userId}`;
     } else {
-      endpoint = `/api/brain/knowledge/${itemId}?user_id=${userId}`;
+      endpoint = `http://localhost:5000/api/brain/knowledge/${itemId}?user_id=${userId}`;
     }
 
     try {
@@ -349,7 +349,7 @@ export default function SecondBrain() {
 
   try {
     const response = await fetch(
-      "/api/brain/knowledge",
+      "http://localhost:5000/api/brain/knowledge",
       {
         method: "POST",
         headers: {
@@ -436,7 +436,7 @@ export default function SecondBrain() {
 
     try {
       const response = await fetch(
-        "/api/brain/knowledge",
+        "http://localhost:5000/api/brain/knowledge",
         {
           method: "POST",
           headers: {
@@ -490,7 +490,7 @@ export default function SecondBrain() {
 
   try {
     const response = await fetch(
-      "/api/brain/ask",
+      "http://localhost:5000/api/brain/ask",
       {
         method: "POST",
         headers: {

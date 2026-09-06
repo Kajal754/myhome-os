@@ -29,7 +29,7 @@ function Family() {
   const loadMembers = async () => {
     try {
       const response = await fetch(
-        `/api/family-members?user_id=${userId}`
+        `http://localhost:5000/api/family-members?user_id=${userId}`
       );
 
       const data = await response.json();
@@ -84,7 +84,7 @@ const deleteMember = async () => {
 
   try {
     const response = await fetch(
-      `/api/family-members/${showDelete.id}?user_id=${userId}`,
+      `http://localhost:5000/api/family-members/${showDelete.id}?user_id=${userId}`,
       {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -114,7 +114,7 @@ const deleteMember = async () => {
   const saveEdit = async (updatedMember) => {
     try {
       const response = await fetch(
-        `/api/family-members/${updatedMember.id}`,
+        `http://localhost:5000/api/family-members/${updatedMember.id}`,
         {
           method: "PUT",
           headers: {
@@ -159,7 +159,7 @@ const deleteMember = async () => {
         `https://i.pravatar.cc/150?u=${newMember.email}`,
     };
 
-    const response = await fetch("/api/family-members", {
+    const response = await fetch("http://localhost:5000/api/family-members", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -48,11 +48,11 @@ const userName = getDisplayName(user);
       const userId = user.id;
 
       const [assetsRes, expensesRes, remindersRes, documentsRes, familyRes] = await Promise.all([
-        fetch(`/api/assets?user_id=${userId}`),
-        fetch(`/api/expenses?user_id=${userId}`),
-        fetch(`/api/reminders?user_id=${userId}`),
-        fetch(`/api/documents?user_id=${userId}`),
-        fetch(`/api/family-members?user_id=${userId}`),
+        fetch(`http://localhost:5000/api/assets?user_id=${userId}`),
+        fetch(`http://localhost:5000/api/expenses?user_id=${userId}`),
+        fetch(`http://localhost:5000/api/reminders?user_id=${userId}`),
+        fetch(`http://localhost:5000/api/documents?user_id=${userId}`),
+        fetch(`http://localhost:5000/api/family-members?user_id=${userId}`),
       ]);
 
       const assetsData = await assetsRes.json();

@@ -94,7 +94,7 @@ useEffect(() => {
 
     try {
       const response = await fetch(
-        `/api/documents?user_id=${userId}`
+        `http://localhost:5000/api/documents?user_id=${userId}`
       );
 
       const data = await response.json();
@@ -152,7 +152,7 @@ useEffect(() => {
 
     try {
       const response = await fetch(
-        `/api/documents/${id}?user_id=${userId}`,
+        `http://localhost:5000/api/documents/${id}?user_id=${userId}`,
         {
           method: "DELETE",
         }
@@ -212,7 +212,7 @@ useEffect(() => {
 
   try {
     const response = await fetch(
-      "/api/documents",
+      "http://localhost:5000/api/documents",
       {
         method: "POST",
         headers: {
@@ -277,7 +277,7 @@ useEffect(() => {
 
   try {
     const response = await fetch(
-  `/api/documents/${updatedDocument.id}?user_id=${userId}`,
+  `http://localhost:5000/api/documents/${updatedDocument.id}?user_id=${userId}`,
   {
     method: "PUT",
         headers: {

@@ -124,7 +124,7 @@ function Sidebar({ mobile = false }) {
 
       try {
         const response = await fetch(
-          `/api/notifications?user_id=${user.id}`
+          `http://localhost:5000/api/notifications?user_id=${user.id}`
         );
         const data = await response.json();
         if (response.ok && Array.isArray(data)) {

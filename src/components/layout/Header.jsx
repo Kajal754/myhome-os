@@ -32,7 +32,7 @@ function Header({ onMenuClick }) {
       if (!user?.id) return;
 
       const response = await fetch(
-        `/api/notifications?user_id=${user.id}`
+        `http://localhost:5000/api/notifications?user_id=${user.id}`
       );
 
       const data = await response.json();

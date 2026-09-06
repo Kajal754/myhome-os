@@ -34,10 +34,10 @@ function Analytics() {
     if (!userId) return;
 
     Promise.all([
-      fetch(`/api/expenses?user_id=${userId}`),
-      fetch(`/api/assets?user_id=${userId}`),
-      fetch(`/api/maintenance?user_id=${userId}`),
-      fetch(`/api/reminders?user_id=${userId}`),
+      fetch(`http://localhost:5000/api/expenses?user_id=${userId}`),
+      fetch(`http://localhost:5000/api/assets?user_id=${userId}`),
+      fetch(`http://localhost:5000/api/maintenance?user_id=${userId}`),
+      fetch(`http://localhost:5000/api/reminders?user_id=${userId}`),
     ])
       .then((responses) => Promise.all(responses.map((response) => response.json())))
       .then(([expenseData, assetData, maintenanceData, reminderData]) => {
