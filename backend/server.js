@@ -26,7 +26,25 @@ console.log("Connected database:", process.env.DB_NAME);
 pool.on("error", (err) => {
   console.error("Unexpected PostgreSQL error:", err);
 });
+app.get("/api/test", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT NOW()");
 
+    res.json({
+      success: true,
+      message: "Backend + Neon Database connected successfully",
+      time: result.rows[0].now,
+    });
+  } catch (error) {
+    console.error("API test error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Database connection failed",
+      error: error.message,
+    });
+  }
+});
 const expensesTableReady = pool.query(`
   ALTER TABLE expenses
   ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
