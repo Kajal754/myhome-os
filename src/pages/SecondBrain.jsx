@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import API_URL from "../config/api";
 import AskMyLife from "../components/brain/AskMyLife";
 import {
   AlertTriangle,
@@ -188,13 +187,13 @@ export default function SecondBrain() {
     try {
       const [knowledgeRes, documentsRes, assetsRes] = await Promise.all([
         fetch(
-          `${API_URL}/api/brain/knowledge?user_id=${userId}`
+          `http://localhost:5000/api/brain/knowledge?user_id=${userId}`
         ),
         fetch(
-         `${API_URL}/api/documents?user_id=${userId}`
+          `http://localhost:5000/api/documents?user_id=${userId}`
         ),
         fetch(
-          `${API_URL}/api/assets?user_id=${userId}`
+          `http://localhost:5000/api/assets?user_id=${userId}`
         ),
       ]);
 
@@ -315,11 +314,11 @@ export default function SecondBrain() {
     let endpoint;
 
     if (itemType === "asset") {
-      endpoint = `${API_URL}/api/assets/${itemId}?user_id=${userId}`;
+      endpoint = `http://localhost:5000/api/assets/${itemId}?user_id=${userId}`;
     } else if (itemType === "document") {
-      endpoint = `${API_URL}/api/documents/${itemId}?user_id=${userId}`;
+      endpoint = `http://localhost:5000/api/documents/${itemId}?user_id=${userId}`;
     } else {
-     endpoint = `${API_URL}/api/brain/knowledge/${itemId}?user_id=${userId}`;
+      endpoint = `http://localhost:5000/api/brain/knowledge/${itemId}?user_id=${userId}`;
     }
 
     try {
@@ -350,7 +349,7 @@ export default function SecondBrain() {
 
   try {
     const response = await fetch(
-      `${API_URL}/api/brain/knowledge`,
+      "http://localhost:5000/api/brain/knowledge",
       {
         method: "POST",
         headers: {
@@ -437,7 +436,7 @@ export default function SecondBrain() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/brain/knowledge`,
+        "http://localhost:5000/api/brain/knowledge",
         {
           method: "POST",
           headers: {
@@ -491,7 +490,7 @@ export default function SecondBrain() {
 
   try {
     const response = await fetch(
-      `${API_URL}/api/brain/ask`,
+      "http://localhost:5000/api/brain/ask",
       {
         method: "POST",
         headers: {
@@ -507,12 +506,6 @@ export default function SecondBrain() {
     const data = await response.json();
 
     console.log("BRAIN RESPONSE:", data);
-
-    if (!response.ok || data.success === false) {
-      throw new Error(
-        data.message || data.error || "Second Brain request failed."
-      );
-    }
 
     const assistantReply =
       data.answer ||
@@ -542,7 +535,7 @@ export default function SecondBrain() {
       },
       {
         role: "assistant",
-        text: `Second Brain error: ${error.message || "Request failed."}`,
+        text: "Second Brain se connect nahi ho pa raha. Please make sure backend server is running.",
       },
     ]);
   }

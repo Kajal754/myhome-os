@@ -1,6 +1,4 @@
-
 import { useEffect, useMemo, useState } from "react";
-import API_URL from "../config/api";
 import { Link } from "react-router-dom";
 import {
   Search,
@@ -66,7 +64,7 @@ function Assets() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/assets?user_id=${userId}`
+        `http://localhost:5000/api/assets?user_id=${userId}`
       );
 
       if (!response.ok) {
@@ -110,7 +108,7 @@ persistLocalAssets(formattedAssets);
 
   try {
     const response = await fetch(
-  `${API_URL}/api/assets/${id}?user_id=${userId}`,
+  `http://localhost:5000/api/assets/${id}?user_id=${userId}`,
   {
     method: "DELETE",
   }
@@ -189,7 +187,7 @@ persistLocalAssets(formattedAssets);
   };
 
   try {
-    const response = await fetch(`${API_URL}/api/assets`, {
+    const response = await fetch("http://localhost:5000/api/assets", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

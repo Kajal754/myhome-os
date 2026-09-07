@@ -1,5 +1,4 @@
 import { useState, useRef } from "react";
-import API_URL from "../config/api";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Home,
@@ -70,7 +69,7 @@ export default function Register() {
       setSendingOtp(true);
 
       const response = await fetch(
-        `${API_URL}/api/auth/send-otp`,
+        "http://localhost:5000/api/auth/send-otp",
         {
           method: "POST",
           headers: {
@@ -150,7 +149,7 @@ export default function Register() {
       setMessage("");
 
       const response = await fetch(
-        `${API_URL}/api/auth/verify-otp`,
+        "http://localhost:5000/api/auth/verify-otp",
         {
           method: "POST",
           headers: {
@@ -195,7 +194,7 @@ export default function Register() {
       setMessage("");
 
       const response = await fetch(
-       `${API_URL}/api/auth/send-otp`,
+        "http://localhost:5000/api/auth/send-otp",
         {
           method: "POST",
           headers: {

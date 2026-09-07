@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 
 import { useEffect, useMemo, useState } from "react";
-import API_URL from "../config/api";
 
 const initialRecords = [
   {
@@ -110,7 +109,7 @@ function Maintenance() {
     const loadRecords = async () => {
       try {
         const response = await fetch(
-          `${API_URL}/api/maintenance?user_id=${userId}`
+          `http://localhost:5000/api/maintenance?user_id=${userId}`
         );
         const data = await response.json();
         if (!response.ok || !data.success) {
@@ -211,7 +210,7 @@ function Maintenance() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/maintenance/${deleteTarget.id}?user_id=${userId}`,
+        `http://localhost:5000/api/maintenance/${deleteTarget.id}?user_id=${userId}`,
         { method: "DELETE" }
       );
       const data = await response.json();
@@ -234,7 +233,7 @@ function Maintenance() {
     const updateRecord = async () => {
       try {
         const response = await fetch(
-          `${API_URL}/api/maintenance/${editingRecord.id}`,
+          `http://localhost:5000/api/maintenance/${editingRecord.id}`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },

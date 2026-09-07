@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import API_URL from "../config/api";
 import {
   CalendarDays,
   ChevronLeft,
@@ -106,9 +105,9 @@ function Calendar() {
     const loadSchedule = async () => {
       try {
         const responses = await Promise.all([
-         fetch(`${API_URL}/api/reminders?user_id=${userId}`),
-fetch(`${API_URL}/api/maintenance?user_id=${userId}`),
-fetch(`${API_URL}/api/assets?user_id=${userId}`),
+          fetch(`http://localhost:5000/api/reminders?user_id=${userId}`),
+          fetch(`http://localhost:5000/api/maintenance?user_id=${userId}`),
+          fetch(`http://localhost:5000/api/assets?user_id=${userId}`),
         ]);
         const [remindersData, maintenanceData, assetsData] = await Promise.all(
           responses.map((response) => response.json())

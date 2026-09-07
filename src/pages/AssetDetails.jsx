@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import API_URL from "../config/api";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -55,9 +54,9 @@ function AssetDetails() {
       try {
         setLoading(true);
 
-       const response = await fetch(
-  `${API_URL}/api/assets/${id}?user_id=${userId}`
-);
+        const response = await fetch(
+          `http://localhost:5000/api/assets/${id}?user_id=${userId}`
+        );
 
         const data = await response.json();
 
@@ -149,7 +148,7 @@ const handleSave = async () => {
     setSaving(true);
 
     const response = await fetch(
-  `${API_URL}/api/assets/${id}`,
+      `http://localhost:5000/api/assets/${id}`,
       {
         method: "PUT",
         headers: {
@@ -222,10 +221,10 @@ const handleSave = async () => {
     if (!confirmDelete) return;
 
     try {
-     const response = await fetch(
-  `${API_URL}/api/assets/${id}?user_id=${userId}`,
-  { method: "DELETE" }
-);
+      const response = await fetch(
+        `http://localhost:5000/api/assets/${id}?user_id=${userId}`,
+        { method: "DELETE" }
+      );
       const data = await response.json();
 
       if (!response.ok || !data.success) {

@@ -23,7 +23,6 @@ import {
   SearchCheck,
   BellRing,
 } from "lucide-react";
-import API_URL from "../../config/api";
 
 import { NavLink } from "react-router-dom";
 import { getDisplayName } from "../../utils/helpers";
@@ -125,7 +124,7 @@ function Sidebar({ mobile = false }) {
 
       try {
         const response = await fetch(
-          `${API_URL}/api/notifications?user_id=${user.id}`
+          `http://localhost:5000/api/notifications?user_id=${user.id}`
         );
         const data = await response.json();
         if (response.ok && Array.isArray(data)) {

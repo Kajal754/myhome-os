@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import API_URL from "../config/api";
 import {
   Plus,
   Search,
@@ -131,7 +130,7 @@ function ServiceProviders() {
     const loadProviders = async () => {
       try {
         const response = await fetch(
-          `${API_URL}/api/service-providers?user_id=${userId}`
+          `http://localhost:5000/api/service-providers?user_id=${userId}`
         );
         const data = await readApiResponse(response);
 
@@ -190,7 +189,7 @@ function ServiceProviders() {
     const providerCategory = form.get("category");
 
     try {
-      const response = await fetch(`${API_URL}/api/service-providers`, {
+      const response = await fetch("http://localhost:5000/api/service-providers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -224,7 +223,7 @@ function ServiceProviders() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/service-providers/${editProvider.id}`,
+        `http://localhost:5000/api/service-providers/${editProvider.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -262,7 +261,7 @@ function ServiceProviders() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/service-providers/${deleteProvider.id}?user_id=${userId}`,
+        `http://localhost:5000/api/service-providers/${deleteProvider.id}?user_id=${userId}`,
         { method: "DELETE" }
       );
       const data = await readApiResponse(response);

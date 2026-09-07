@@ -14,10 +14,11 @@ app.use(express.json({ limit: "10mb" }));
 // ==========================================
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
 });
 
 console.log("Connected database:", process.env.DB_NAME);
@@ -2817,7 +2818,7 @@ app.post("/api/brain/ask", async (req, res) => {
   remindersResult,
   providersResult,
   settingsResult,
-] = await Promise.allSettled([
+] = await Promise.all([
       pool.query(
   `
   SELECT
@@ -2975,24 +2976,15 @@ app.post("/api/brain/ask", async (req, res) => {
       ),
     ]);
 
-    const rowsFrom = (result, section) => {
-      if (result.status === "rejected") {
-        console.error(`SECOND BRAIN ${section} QUERY ERROR:`, result.reason);
-        return [];
-      }
-
-      return result.value.rows;
-    };
-
-    const documents = rowsFrom(documentsResult, "DOCUMENTS");
-    const assets = rowsFrom(assetsResult, "ASSETS");
-    const expenses = rowsFrom(expensesResult, "EXPENSES");
-    const maintenance = rowsFrom(maintenanceResult, "MAINTENANCE");
-    const knowledge = rowsFrom(knowledgeResult, "KNOWLEDGE");
-    const familyMembers = rowsFrom(familyResult, "FAMILY");
-    const reminders = rowsFrom(remindersResult, "REMINDERS");
-    const serviceProviders = rowsFrom(providersResult, "PROVIDERS");
-    const settings = rowsFrom(settingsResult, "SETTINGS");
+    const documents = documentsResult.rows;
+    const assets = assetsResult.rows;
+    const expenses = expensesResult.rows;
+    const maintenance = maintenanceResult.rows;
+    const knowledge = knowledgeResult.rows;
+    const familyMembers = familyResult.rows;
+    const reminders = remindersResult.rows;
+    const serviceProviders = providersResult.rows;
+    const settings = settingsResult.rows;
 
     console.log("====================================");
     console.log("SECOND BRAIN USER:", user_id);
@@ -3771,11 +3763,7 @@ if (asksAsset) {
       "mere paas",
       "mere pass",
       "my assets",
-      "total assets",
-      "ghar ke assets",
-      "ghar ke total assets",
       "all assets",
-      "total items",
       "kaun kaun",
       "kaun kaun se",
       "kya kya asset",

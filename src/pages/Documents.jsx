@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import API_URL from "../config/api";
 import {
   Search,
   Plus,
@@ -95,7 +94,7 @@ useEffect(() => {
 
     try {
       const response = await fetch(
-       `${API_URL}/api/documents?user_id=${userId}`
+        `http://localhost:5000/api/documents?user_id=${userId}`
       );
 
       const data = await response.json();
@@ -153,7 +152,7 @@ useEffect(() => {
 
     try {
       const response = await fetch(
-       `${API_URL}/api/documents/${id}?user_id=${userId}`,
+        `http://localhost:5000/api/documents/${id}?user_id=${userId}`,
         {
           method: "DELETE",
         }
@@ -213,7 +212,7 @@ useEffect(() => {
 
   try {
     const response = await fetch(
-      `${API_URL}/api/documents?user_id=${userId}`,
+      "http://localhost:5000/api/documents",
       {
         method: "POST",
         headers: {
@@ -278,7 +277,7 @@ useEffect(() => {
 
   try {
     const response = await fetch(
-  `${API_URL}/api/documents/${updatedDocument.id}?user_id=${userId}`,
+  `http://localhost:5000/api/documents/${updatedDocument.id}?user_id=${userId}`,
   {
     method: "PUT",
         headers: {

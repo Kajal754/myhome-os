@@ -1,6 +1,4 @@
-
 import { useState, useMemo, useEffect } from "react";
-import API_URL from "../config/api";
 
 import {
   Wallet,
@@ -102,7 +100,21 @@ const chartData = [
   ["Jul", 62],
   ["Aug", 88],
 ];
+const formatDate = (date) => {
+  if (!date) return "";
 
+  const d = new Date(date);
+
+  if (Number.isNaN(d.getTime())) {
+    return date;
+  }
+
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
 function Expenses() {
   const storedUser = localStorage.getItem("myhomeUser");
   const user = storedUser ? JSON.parse(storedUser) : null;
@@ -123,7 +135,7 @@ function Expenses() {
     const loadExpenses = async () => {
       try {
         const response = await fetch(
-          `${API_URL}/api/expenses?user_id=${userId}`
+          `http://localhost:5000/api/expenses?user_id=${userId}`
         );
         const data = await response.json();
 
@@ -193,7 +205,7 @@ function Expenses() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/expenses/${deleteTarget.id}?user_id=${userId}`,
+        `http://localhost:5000/api/expenses/${deleteTarget.id}?user_id=${userId}`,
         { method: "DELETE" }
       );
       const data = await response.json();
@@ -217,7 +229,7 @@ function Expenses() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/expenses/${editingExpense.id}`,
+        `http://localhost:5000/api/expenses/${editingExpense.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -272,7 +284,7 @@ function Expenses() {
   }
 
   try {
-    const response = await fetch(`${API_URL}/api/expenses`, {
+    const response = await fetch("http://localhost:5000/api/expenses", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

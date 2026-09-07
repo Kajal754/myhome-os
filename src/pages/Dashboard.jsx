@@ -1,6 +1,5 @@
 
 import { useEffect, useState } from "react";
-import API_URL from "../config/api";
 import {
   Package,
   ShieldCheck,
@@ -49,11 +48,11 @@ const userName = getDisplayName(user);
       const userId = user.id;
 
       const [assetsRes, expensesRes, remindersRes, documentsRes, familyRes] = await Promise.all([
-       fetch(`${API_URL}/api/assets?user_id=${userId}`),
-fetch(`${API_URL}/api/expenses?user_id=${userId}`),
-fetch(`${API_URL}/api/reminders?user_id=${userId}`),
-fetch(`${API_URL}/api/documents?user_id=${userId}`),
-fetch(`${API_URL}/api/family-members?user_id=${userId}`),
+        fetch(`http://localhost:5000/api/assets?user_id=${userId}`),
+        fetch(`http://localhost:5000/api/expenses?user_id=${userId}`),
+        fetch(`http://localhost:5000/api/reminders?user_id=${userId}`),
+        fetch(`http://localhost:5000/api/documents?user_id=${userId}`),
+        fetch(`http://localhost:5000/api/family-members?user_id=${userId}`),
       ]);
 
       const assetsData = await assetsRes.json();

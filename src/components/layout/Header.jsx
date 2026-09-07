@@ -8,7 +8,6 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import API_URL from "../../config/api";
 import { getDisplayName } from "../../utils/helpers";
 
 function Header({ onMenuClick }) {
@@ -33,7 +32,7 @@ function Header({ onMenuClick }) {
       if (!user?.id) return;
 
       const response = await fetch(
-        `${API_URL}/api/notifications?user_id=${user.id}`
+        `http://localhost:5000/api/notifications?user_id=${user.id}`
       );
 
       const data = await response.json();
