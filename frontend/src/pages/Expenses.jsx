@@ -135,7 +135,7 @@ function Expenses() {
     const loadExpenses = async () => {
       try {
         const response = await fetch(
-          `http://localhost:5000/api/expenses?user_id=${userId}`
+          `https://myhome-os-backend.vercel.app/api/expenses?user_id=${userId}`
         );
         const data = await response.json();
 
@@ -205,7 +205,7 @@ function Expenses() {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/expenses/${deleteTarget.id}?user_id=${userId}`,
+        `https://myhome-os-backend.vercel.app/api/expenses/${deleteTarget.id}?user_id=${userId}`,
         { method: "DELETE" }
       );
       const data = await response.json();
@@ -229,7 +229,7 @@ function Expenses() {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/expenses/${editingExpense.id}`,
+        `https://myhome-os-backend.vercel.app/api/expenses/${editingExpense.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -284,7 +284,7 @@ function Expenses() {
   }
 
   try {
-    const response = await fetch("http://localhost:5000/api/expenses", {
+    const response = await fetch("https://myhome-os-backend.vercel.app/api/expenses", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

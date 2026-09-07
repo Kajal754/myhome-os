@@ -55,7 +55,7 @@ useEffect(() => {
       if (!userId) return;
 
       const response = await fetch(
-        `http://localhost:5000/api/settings?user_id=${userId}`
+        `https://myhome-os-backend.vercel.app/api/settings?user_id=${userId}`
       );
       const data = await response.json();
 
@@ -168,7 +168,7 @@ useEffect(() => {
   }
 
   try {
-    const response = await fetch("http://localhost:5000/api/settings", {
+    const response = await fetch("https://myhome-os-backend.vercel.app/api/settings", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -232,7 +232,7 @@ useEffect(() => {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/settings",
+        "https://myhome-os-backend.vercel.app/api/settings",
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

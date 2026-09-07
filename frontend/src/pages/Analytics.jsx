@@ -34,10 +34,10 @@ function Analytics() {
     if (!userId) return;
 
     Promise.all([
-      fetch(`http://localhost:5000/api/expenses?user_id=${userId}`),
-      fetch(`http://localhost:5000/api/assets?user_id=${userId}`),
-      fetch(`http://localhost:5000/api/maintenance?user_id=${userId}`),
-      fetch(`http://localhost:5000/api/reminders?user_id=${userId}`),
+      fetch(`https://myhome-os-backend.vercel.app/api/expenses?user_id=${userId}`),
+      fetch(`https://myhome-os-backend.vercel.app/api/assets?user_id=${userId}`),
+      fetch(`https://myhome-os-backend.vercel.app/api/maintenance?user_id=${userId}`),
+      fetch(`https://myhome-os-backend.vercel.app/api/reminders?user_id=${userId}`),
     ])
       .then((responses) => Promise.all(responses.map((response) => response.json())))
       .then(([expenseData, assetData, maintenanceData, reminderData]) => {

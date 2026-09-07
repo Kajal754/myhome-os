@@ -12,7 +12,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-const API = "http://localhost:5000";
+const API = "https://myhome-os-backend.vercel.app";
 
 function getScoreLabel(score) {
   if (score >= 85) return "Excellent";

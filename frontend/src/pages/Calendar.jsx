@@ -105,9 +105,9 @@ function Calendar() {
     const loadSchedule = async () => {
       try {
         const responses = await Promise.all([
-          fetch(`http://localhost:5000/api/reminders?user_id=${userId}`),
-          fetch(`http://localhost:5000/api/maintenance?user_id=${userId}`),
-          fetch(`http://localhost:5000/api/assets?user_id=${userId}`),
+          fetch(`https://myhome-os-backend.vercel.app/api/reminders?user_id=${userId}`),
+          fetch(`https://myhome-os-backend.vercel.app/api/maintenance?user_id=${userId}`),
+          fetch(`https://myhome-os-backend.vercel.app/api/assets?user_id=${userId}`),
         ]);
         const [remindersData, maintenanceData, assetsData] = await Promise.all(
           responses.map((response) => response.json())

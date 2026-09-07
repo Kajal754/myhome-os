@@ -92,7 +92,7 @@ export default function LifeAuditor() {
       console.log("LIFE AUDITOR USER ID:", userId);
 
       const response = await fetch(
-        `http://localhost:5000/api/life-auditor?user_id=${userId}`
+        `https://myhome-os-backend.vercel.app/api/life-auditor?user_id=${userId}`
       );
 
       const result = await response.json();

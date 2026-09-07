@@ -109,7 +109,7 @@ function Maintenance() {
     const loadRecords = async () => {
       try {
         const response = await fetch(
-          `http://localhost:5000/api/maintenance?user_id=${userId}`
+          `https://myhome-os-backend.vercel.app/api/maintenance?user_id=${userId}`
         );
         const data = await response.json();
         if (!response.ok || !data.success) {
@@ -210,7 +210,7 @@ function Maintenance() {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/maintenance/${deleteTarget.id}?user_id=${userId}`,
+        `https://myhome-os-backend.vercel.app/api/maintenance/${deleteTarget.id}?user_id=${userId}`,
         { method: "DELETE" }
       );
       const data = await response.json();
@@ -233,7 +233,7 @@ function Maintenance() {
     const updateRecord = async () => {
       try {
         const response = await fetch(
-          `http://localhost:5000/api/maintenance/${editingRecord.id}`,
+          `https://myhome-os-backend.vercel.app/api/maintenance/${editingRecord.id}`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },

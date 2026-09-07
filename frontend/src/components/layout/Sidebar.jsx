@@ -124,7 +124,7 @@ function Sidebar({ mobile = false }) {
 
       try {
         const response = await fetch(
-          `http://localhost:5000/api/notifications?user_id=${user.id}`
+          `https://myhome-os-backend.vercel.app/api/notifications?user_id=${user.id}`
         );
         const data = await response.json();
         if (response.ok && Array.isArray(data)) {

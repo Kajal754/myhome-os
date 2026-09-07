@@ -64,7 +64,7 @@ function Assets() {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/assets?user_id=${userId}`
+        `https://myhome-os-backend.vercel.app/api/assets?user_id=${userId}`
       );
 
       if (!response.ok) {
@@ -108,7 +108,7 @@ persistLocalAssets(formattedAssets);
 
   try {
     const response = await fetch(
-  `http://localhost:5000/api/assets/${id}?user_id=${userId}`,
+  `https://myhome-os-backend.vercel.app/api/assets/${id}?user_id=${userId}`,
   {
     method: "DELETE",
   }
@@ -187,7 +187,7 @@ persistLocalAssets(formattedAssets);
   };
 
   try {
-    const response = await fetch("http://localhost:5000/api/assets", {
+    const response = await fetch("https://myhome-os-backend.vercel.app/api/assets", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

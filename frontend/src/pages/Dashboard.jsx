@@ -48,11 +48,11 @@ const userName = getDisplayName(user);
       const userId = user.id;
 
       const [assetsRes, expensesRes, remindersRes, documentsRes, familyRes] = await Promise.all([
-        fetch(`http://localhost:5000/api/assets?user_id=${userId}`),
-        fetch(`http://localhost:5000/api/expenses?user_id=${userId}`),
-        fetch(`http://localhost:5000/api/reminders?user_id=${userId}`),
-        fetch(`http://localhost:5000/api/documents?user_id=${userId}`),
-        fetch(`http://localhost:5000/api/family-members?user_id=${userId}`),
+        fetch(`https://myhome-os-backend.vercel.app/api/assets?user_id=${userId}`),
+        fetch(`https://myhome-os-backend.vercel.app/api/expenses?user_id=${userId}`),
+        fetch(`https://myhome-os-backend.vercel.app/api/reminders?user_id=${userId}`),
+        fetch(`https://myhome-os-backend.vercel.app/api/documents?user_id=${userId}`),
+        fetch(`https://myhome-os-backend.vercel.app/api/family-members?user_id=${userId}`),
       ]);
 
       const assetsData = await assetsRes.json();

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import API_URL from "../config/api";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -55,7 +56,7 @@ function AssetDetails() {
         setLoading(true);
 
         const response = await fetch(
-          `http://localhost:5000/api/assets/${id}?user_id=${userId}`
+          `https://myhome-os-backend.vercel.app/api/assets/${id}?user_id=${userId}`
         );
 
         const data = await response.json();
@@ -147,10 +148,11 @@ const handleSave = async () => {
   try {
     setSaving(true);
 
-    const response = await fetch(
-      `http://localhost:5000/api/assets/${id}`,
-      {
-        method: "PUT",
+    
+      const response = await fetch(
+  `${API_URL}/api/assets/${id}`,
+  {
+    method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
@@ -222,8 +224,9 @@ const handleSave = async () => {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/assets/${id}?user_id=${userId}`,
-        { method: "DELETE" }
+  `${API_URL}/api/assets/${id}?user_id=${userId}`,
+  { method: "DELETE" }
+
       );
       const data = await response.json();
 

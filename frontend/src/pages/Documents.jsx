@@ -94,7 +94,7 @@ useEffect(() => {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/documents?user_id=${userId}`
+        `https://myhome-os-backend.vercel.app/api/documents?user_id=${userId}`
       );
 
       const data = await response.json();
@@ -152,7 +152,7 @@ useEffect(() => {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/documents/${id}?user_id=${userId}`,
+        `https://myhome-os-backend.vercel.app/api/documents/${id}?user_id=${userId}`,
         {
           method: "DELETE",
         }
@@ -212,7 +212,7 @@ useEffect(() => {
 
   try {
     const response = await fetch(
-      "http://localhost:5000/api/documents",
+      "https://myhome-os-backend.vercel.app/api/documents",
       {
         method: "POST",
         headers: {
@@ -277,7 +277,7 @@ useEffect(() => {
 
   try {
     const response = await fetch(
-  `http://localhost:5000/api/documents/${updatedDocument.id}?user_id=${userId}`,
+  `https://myhome-os-backend.vercel.app/api/documents/${updatedDocument.id}?user_id=${userId}`,
   {
     method: "PUT",
         headers: {
