@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const { Pool } = require("pg");
 const nodemailer = require("nodemailer");
+const crypto = require("crypto");
 require("dotenv").config();
 
 const app = express();
@@ -161,6 +162,19 @@ const emailReminderLogReady = pool.query(`
   throw error;
 });
 
+const passwordResetTokensReady = pool.query(`
+  CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )
+`).catch((error) => {
+  console.error("PASSWORD RESET TOKENS TABLE ERROR:", error);
+  throw error;
+});
+
 // ==========================================
 // EMAIL
 // ==========================================
@@ -251,6 +265,78 @@ app.get("/api/test", async (req, res) => {
 // ==========================================
 // AUTH - LOGIN
 // ==========================================
+
+app.post("/api/auth/forgot-password", async (req, res) => {
+  try {
+    await passwordResetTokensReady;
+    const email = String(req.body.email || "").trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+
+    const result = await pool.query("SELECT id, name, email FROM users WHERE email = $1 LIMIT 1", [email]);
+    if (result.rows.length) {
+      const user = result.rows[0];
+      const otp = crypto.randomInt(100000, 1000000).toString();
+      const tokenHash = crypto.createHash("sha256").update(otp).digest("hex");
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+      await pool.query("DELETE FROM password_reset_tokens WHERE user_id = $1", [user.id]);
+      await pool.query(
+        "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)",
+        [user.id, tokenHash, expiresAt]
+      );
+
+      await transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: user.email,
+        subject: "Your MyHome OS password reset code",
+        text: `Hello,\n\nYour MyHome OS password reset code is ${otp}. It expires in 10 minutes.\n\nIf you did not request this, you can ignore this email.`,
+        html: `<p>Hello,</p><p>Your MyHome OS password reset code is:</p><p style="font-size:28px;font-weight:bold;letter-spacing:8px">${otp}</p><p>This code expires in 10 minutes. If you did not request this, you can ignore this email.</p>`,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "If an account exists for this email, a password reset code has been sent.",
+    });
+  } catch (error) {
+    console.error("FORGOT PASSWORD ERROR:", error);
+    return res.status(500).json({ success: false, message: "Could not send the password reset email." });
+  }
+});
+
+app.post("/api/auth/reset-password", async (req, res) => {
+  try {
+    await passwordResetTokensReady;
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const otp = String(req.body.otp || "").trim();
+    const password = String(req.body.password || "");
+    if (!email || !/^\d{6}$/.test(otp) || password.length < 8) {
+      return res.status(400).json({ success: false, message: "A valid 6-digit code and an 8-character password are required." });
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(otp).digest("hex");
+    const result = await pool.query(
+      `SELECT reset.user_id
+       FROM password_reset_tokens reset
+       JOIN users ON users.id = reset.user_id
+       WHERE users.email = $1 AND reset.token_hash = $2 AND reset.expires_at > NOW()
+       LIMIT 1`,
+      [email, tokenHash]
+    );
+    if (!result.rows.length) {
+      return res.status(400).json({ success: false, message: "The code is incorrect or expired. Request a new one." });
+    }
+
+    await pool.query("UPDATE users SET password = $1 WHERE id = $2", [password, result.rows[0].user_id]);
+    await pool.query("DELETE FROM password_reset_tokens WHERE user_id = $1", [result.rows[0].user_id]);
+    return res.json({ success: true, message: "Password reset successfully. You can now sign in." });
+  } catch (error) {
+    console.error("RESET PASSWORD ERROR:", error);
+    return res.status(500).json({ success: false, message: "Could not reset the password." });
+  }
+});
 
 app.post("/api/auth/login", async (req, res) => {
   try {
