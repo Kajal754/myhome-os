@@ -1,3 +1,4 @@
+
 import {
   BrowserRouter,
   Routes,
@@ -7,11 +8,12 @@ import {
 
 import MainLayout from "./components/layout/MainLayout";
 
-// Auth pages
+// Public pages
+import HomePage from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 
-// Main pages
+// Dashboard pages
 import Dashboard from "./pages/Dashboard";
 import Assets from "./pages/Assets";
 import AssetDetails from "./pages/AssetDetails";
@@ -26,223 +28,66 @@ import Calendar from "./pages/Calendar";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 
-import ManagementPage from "./pages/ManagementPages";
 import SecondBrain from "./pages/SecondBrain";
 import LifeRadar from "./pages/LifeRadar";
 import LifeAuditor from "./pages/LifeAuditor";
 import SmartAlerts from "./pages/SmartAlerts";
 
-
-// =====================================================
-// PROTECTED ROUTES
-// =====================================================
-
 function ProtectedRoutes() {
-
   const isLoggedIn =
     localStorage.getItem("isLoggedIn") === "true";
 
-
-  // Login nahi hai
   if (!isLoggedIn) {
     return <Navigate to="/login" replace />;
   }
 
-
-  // Login hai
   return (
     <MainLayout>
-
       <Routes>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/second-brain" element={<SecondBrain />} />
+        <Route path="/life-radar" element={<LifeRadar />} />
+        <Route path="/life-auditor" element={<LifeAuditor />} />
+        <Route path="/smart-alerts" element={<SmartAlerts />} />
 
-        {/* ================= DASHBOARD ================= */}
-
-        <Route
-          path="/dashboard"
-          element={<Dashboard />}
-        />
-{/* ================= SECOND BRAIN ================= */}
-
-<Route
-  path="/second-brain"
-  element={<SecondBrain />}
-/>
-
-
-{/* ================= LIFE RADAR ================= */}
-
-<Route
-  path="/life-radar"
-  element={<LifeRadar />}
-/>
-
-
-{/* ================= LIFE AUDITOR ================= */}
-
-<Route
-  path="/life-auditor"
-  element={<LifeAuditor />}
-/>
-
-
-{/* ================= SMART ALERTS ================= */}
-
-<Route
-  path="/smart-alerts"
-  element={<SmartAlerts />}
-/>
-
-        {/* ================= ASSETS ================= */}
-
-        <Route
-          path="/assets"
-          element={<Assets />}
-        />
-
-        <Route
-          path="/assets/:id"
-          element={<AssetDetails />}
-        />
-
-
-        {/* ================= DOCUMENTS ================= */}
-
-        <Route
-          path="/documents"
-          element={<Documents />}
-        />
-
-
-        {/* ================= WARRANTIES ================= */}
-
-        <Route
-          path="/warranties"
-          element={<Warranties />}
-        />
-
-
-        {/* ================= MAINTENANCE ================= */}
-
-        <Route
-          path="/maintenance"
-          element={<Maintenance />}
-        />
-
-
-        {/* ================= EXPENSES ================= */}
-
-        <Route
-          path="/expenses"
-          element={<Expenses />}
-        />
-
-
-        {/* ================= REMINDERS ================= */}
-
-        <Route
-          path="/reminders"
-          element={<Reminders />}
-        />
-
-
-        {/* ================= FAMILY ================= */}
-
-        <Route
-          path="/family"
-          element={<Family />}
-        />
-
-
-        {/* ================= SERVICE PROVIDERS ================= */}
-
-        <Route
-          path="/service-providers"
-          element={<ServiceProviders />}
-        />
-
-
-        {/* ================= CALENDAR ================= */}
-
-        <Route
-          path="/calendar"
-          element={<Calendar />}
-        />
-
-
-        {/* ================= ANALYTICS ================= */}
-
-        <Route
-          path="/analytics"
-          element={<Analytics />}
-        />
-
-
-        {/* ================= SETTINGS ================= */}
-
-        <Route
-          path="/settings"
-          element={<Settings />}
-        />
-
-
-        {/* ================= UNKNOWN PAGE ================= */}
+        <Route path="/assets" element={<Assets />} />
+        <Route path="/assets/:id" element={<AssetDetails />} />
+        <Route path="/documents" element={<Documents />} />
+        <Route path="/warranties" element={<Warranties />} />
+        <Route path="/maintenance" element={<Maintenance />} />
+        <Route path="/expenses" element={<Expenses />} />
+        <Route path="/reminders" element={<Reminders />} />
+        <Route path="/family" element={<Family />} />
+        <Route path="/service-providers" element={<ServiceProviders />} />
+        <Route path="/calendar" element={<Calendar />} />
+        <Route path="/analytics" element={<Analytics />} />
+        <Route path="/settings" element={<Settings />} />
 
         <Route
           path="*"
-          element={
-            <Navigate
-              to="/dashboard"
-              replace
-            />
-          }
+          element={<Navigate to="/dashboard" replace />}
         />
-
       </Routes>
-
     </MainLayout>
   );
 }
 
-
-// =====================================================
-// MAIN APP
-// =====================================================
-
 function App() {
-
   return (
     <BrowserRouter>
-
       <Routes>
+        {/* Public Home Page */}
+        <Route path="/" element={<HomePage />} />
 
-        {/* ================= LOGIN ================= */}
+        {/* Authentication */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
-        <Route
-          path="/login"
-          element={<Login />}
-        />
-
-
-        {/* ================= REGISTER ================= */}
-
-        <Route
-          path="/register"
-          element={<Register />}
-        />
-
-
-        {/* ================= PROTECTED APP ================= */}
-
-        <Route
-          path="/*"
-          element={<ProtectedRoutes />}
-        />
-
+        {/* Protected Dashboard */}
+        <Route path="/*" element={<ProtectedRoutes />} />
       </Routes>
-
     </BrowserRouter>
   );
 }
-
 
 export default App;

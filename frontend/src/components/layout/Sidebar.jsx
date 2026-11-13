@@ -136,10 +136,11 @@ function Sidebar({ mobile = false }) {
     };
 
     loadUnreadNotifications();
-    window.addEventListener("myhome-notifications-change", loadUnreadNotifications);
+    const clearSeenNotifications = () => setUnreadNotifications(0);
+    window.addEventListener("myhome-notifications-change", clearSeenNotifications);
 
     return () => {
-      window.removeEventListener("myhome-notifications-change", loadUnreadNotifications);
+      window.removeEventListener("myhome-notifications-change", clearSeenNotifications);
     };
   }, []);
 

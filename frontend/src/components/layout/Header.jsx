@@ -38,7 +38,7 @@ function Header({ onMenuClick }) {
       const data = await response.json();
 
       if (response.ok) {
-        setNotifications(data);
+        setNotifications(data.filter((notification) => !notification.is_read));
       }
     } catch (error) {
       console.error("Failed to load notifications:", error);
@@ -47,6 +47,15 @@ function Header({ onMenuClick }) {
 
   loadNotifications();
 }, []);
+
+  useEffect(() => {
+    const clearSeenNotifications = () => setNotifications([]);
+    window.addEventListener("myhome-notifications-change", clearSeenNotifications);
+
+    return () => {
+      window.removeEventListener("myhome-notifications-change", clearSeenNotifications);
+    };
+  }, []);
 
   useEffect(() => {
     const updateProfile = () => {
@@ -136,6 +145,27 @@ function Header({ onMenuClick }) {
     setSearch("");
     setShowSearch(false);
     window.location.href = path;
+  };
+
+  const openNotifications = async () => {
+    setNotifications([]);
+    window.dispatchEvent(new Event("myhome-notifications-change"));
+
+    const savedUser = localStorage.getItem("myhomeUser");
+    const user = savedUser ? JSON.parse(savedUser) : null;
+    if (user?.id) {
+      try {
+        await fetch("https://myhome-os-backend.vercel.app/api/notifications/read", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: user.id }),
+        });
+      } catch (error) {
+        console.error("MARK notifications read error:", error);
+      }
+    }
+
+    openPage("/reminders");
   };
 
   useEffect(() => {
@@ -240,7 +270,7 @@ function Header({ onMenuClick }) {
         <div className="ml-auto flex items-center gap-1 sm:gap-2">
           <button
             type="button"
-            onClick={() => openPage("/reminders")}
+            onClick={openNotifications}
             title="Open Reminders"
             className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
           >

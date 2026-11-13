@@ -23,6 +23,20 @@ import {
 import { Link } from "react-router-dom";
 import { getDisplayName } from "../utils/helpers";
 
+const expenseChartColors = ["#2563eb", "#10b981", "#8b5cf6", "#f97316", "#ec4899"];
+
+function parseExpenseDate(value) {
+  if (!value) return null;
+  const text = String(value).trim();
+  const isoDate = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const date = isoDate
+    ? new Date(Number(isoDate[1]), Number(isoDate[2]) - 1, Number(isoDate[3]))
+    : new Date(text);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+const formatExpenseAmount = (amount) =>
+  `₹${Number(amount || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 
 
 function Dashboard() {
@@ -36,6 +50,58 @@ const userName = getDisplayName(user);
   const [reminders, setReminders] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [familyMembers, setFamilyMembers] = useState([]);
+
+  const currentDate = new Date();
+  const expenseMonths = Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - 5 + index, 1);
+    return {
+      key: `${date.getFullYear()}-${date.getMonth()}`,
+      label: date.toLocaleDateString("en-IN", { month: "short" }),
+      total: 0,
+    };
+  });
+  expenses.forEach((expense) => {
+    const date = parseExpenseDate(expense.date);
+    if (!date) return;
+    const month = expenseMonths.find(
+      (item) => item.key === `${date.getFullYear()}-${date.getMonth()}`
+    );
+    if (month) month.total += Number(expense.amount) || 0;
+  });
+  const currentMonthKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
+  const currentMonthExpenses = expenses.filter((expense) => {
+    const date = parseExpenseDate(expense.date);
+    return date && `${date.getFullYear()}-${date.getMonth()}` === currentMonthKey;
+  });
+  const categoryTotals = Object.entries(
+    currentMonthExpenses.reduce((totals, expense) => {
+      const category = String(expense.category || "Other").trim() || "Other";
+      totals[category] = (totals[category] || 0) + (Number(expense.amount) || 0);
+      return totals;
+    }, {})
+  ).sort((a, b) => b[1] - a[1]);
+  const chartCategories = categoryTotals.slice(0, 4);
+  const remainingCategories = categoryTotals.slice(4);
+  if (remainingCategories.length) {
+    chartCategories.push(["Other", remainingCategories.reduce((sum, [, amount]) => sum + amount, 0)]);
+  }
+  const categoryTotal = chartCategories.reduce((sum, [, amount]) => sum + amount, 0);
+  let chartOffset = 0;
+  const categoryGradient = categoryTotal
+    ? `conic-gradient(${chartCategories.map(([, amount], index) => {
+        const start = chartOffset;
+        chartOffset += (amount / categoryTotal) * 100;
+        return `${expenseChartColors[index % expenseChartColors.length]} ${start}% ${chartOffset}%`;
+      }).join(", ")})`
+    : "conic-gradient(#e2e8f0 0% 100%)";
+  const trendMax = Math.max(...expenseMonths.map((month) => month.total), 0);
+  const trendPoints = expenseMonths.map((month, index) => ({
+    x: 20 + (550 * index) / (expenseMonths.length - 1),
+    y: 145 - (trendMax ? (month.total / trendMax) * 115 : 0),
+    ...month,
+  }));
+  const trendLine = trendPoints.map(({ x, y }) => `${x},${y}`).join(" ");
+  const trendArea = `${trendLine} 570,170 20,170`;
 
   useEffect(() => {
     if (!user?.id) return;
@@ -114,7 +180,7 @@ const userName = getDisplayName(user);
   {userName}! 👋
 </h1>
 
-          <p className="mt-3 max-w-[390px] text-sm leading-6 text-slate-500">
+          <p className="mt-3 max-w-[390px] text-sm leading-6 text-[#334155] dark:text-[#334155]">
             Here's everything happening with your home today.
             Keep your assets, expenses and maintenance under control.
           </p>
@@ -395,15 +461,12 @@ const userName = getDisplayName(user);
 
               <div
                 className="h-full w-full rounded-full"
-                style={{
-                  background:
-                    "conic-gradient(#2563eb 0 32%, #10b981 32% 60%, #8b5cf6 60% 80%, #f97316 80% 92%, #ec4899 92% 100%)",
-                }}
+                style={{ background: categoryGradient }}
               />
 
               <div className="absolute inset-[24px] flex flex-col items-center justify-center rounded-full bg-white">
                 <strong className="text-sm">
-                  ₹24,590
+                  {formatExpenseAmount(categoryTotal)}
                 </strong>
 
                 <span className="text-[9px] text-slate-400">
@@ -415,11 +478,14 @@ const userName = getDisplayName(user);
 
             <div className="space-y-2.5">
 
-              <Legend color="bg-blue-600" text="Maintenance" value="32%" />
-              <Legend color="bg-emerald-500" text="Vehicle" value="28%" />
-              <Legend color="bg-violet-500" text="Utilities" value="20%" />
-              <Legend color="bg-orange-500" text="Repairs" value="12%" />
-              <Legend color="bg-pink-500" text="Others" value="8%" />
+              {chartCategories.length ? chartCategories.map(([category, amount], index) => (
+                <Legend
+                  key={category}
+                  color={expenseChartColors[index % expenseChartColors.length]}
+                  text={category}
+                  value={`${Math.round((amount / categoryTotal) * 100)}%`}
+                />
+              )) : <p className="max-w-32 text-[10px] leading-4 text-slate-400">No expenses recorded this month</p>}
 
             </div>
 
@@ -435,7 +501,7 @@ const userName = getDisplayName(user);
             </h2>
 
             <span className="rounded-lg bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-600">
-              2026
+              {currentDate.getFullYear()}
             </span>
           </div>
 
@@ -471,35 +537,27 @@ const userName = getDisplayName(user);
 
               </defs>
 
-              <path
-                d="M20 145 L130 120 L240 105 L350 82 L460 50 L570 25 L570 170 L20 170Z"
-                fill="url(#area)"
-              />
+              <polygon points={trendArea} fill="url(#area)" />
 
-              <path
-                d="M20 145 L130 120 L240 105 L350 82 L460 50 L570 25"
+              <polyline
+                points={trendLine}
                 fill="none"
                 stroke="#2563eb"
                 strokeWidth="4"
                 strokeLinecap="round"
+                strokeLinejoin="round"
               />
 
-              {[
-                [20, 145],
-                [130, 120],
-                [240, 105],
-                [350, 82],
-                [460, 50],
-                [570, 25],
-              ].map(([x, y]) => (
+              {trendPoints.map(({ x, y, key, total }) => (
                 <circle
-                  key={`${x}-${y}`}
+                  key={key}
                   cx={x}
                   cy={y}
                   r="5"
                   fill="white"
                   stroke="#2563eb"
                   strokeWidth="3"
+                  aria-label={`${formatExpenseAmount(total)} in ${key}`}
                 />
               ))}
 
@@ -508,12 +566,7 @@ const userName = getDisplayName(user);
           </div>
 
           <div className="flex justify-between text-[9px] text-slate-400">
-            <span>Mar</span>
-            <span>Apr</span>
-            <span>May</span>
-            <span>Jun</span>
-            <span>Jul</span>
-            <span>Aug</span>
+            {expenseMonths.map((month) => <span key={month.key} title={formatExpenseAmount(month.total)}>{month.label}</span>)}
           </div>
 
         </div>
@@ -681,7 +734,7 @@ function Card({ title, link, children }) {
 function Legend({ color, text, value }) {
   return (
     <div className="flex min-w-[120px] items-center gap-2">
-      <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
+      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
       <span className="flex-1 text-[10px] text-slate-500">
         {text}
       </span>
